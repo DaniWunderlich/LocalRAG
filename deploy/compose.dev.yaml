@@ -1,0 +1,15 @@
+# Use together with compose.yaml; dependencies remain outside source mounts.
+services:
+  backend:
+    environment:
+      PYTHONPATH: /app/src
+    volumes:
+      - ../backend/src:/app/src:ro
+    command: ["uvicorn", "rag.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/src"]
+  frontend:
+    volumes:
+      - ../frontend/app.py:/app/app.py:ro
+      - ../frontend/api_client.py:/app/api_client.py:ro
+      - ../frontend/ui.py:/app/ui.py:ro
+      - ../frontend/pages:/app/pages:ro
+    command: ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.headless", "true", "--server.runOnSave", "true"]

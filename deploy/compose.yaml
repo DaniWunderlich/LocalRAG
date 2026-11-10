@@ -1,0 +1,75 @@
+# Only the browser interface is published; Ollama runs outside this stack.
+services:
+  frontend:
+    build:
+      context: ../frontend
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8501}:8501"
+    environment:
+      BACKEND_URL: http://backend:8000
+      BACKEND_TIMEOUT_SECONDS: "${BACKEND_TIMEOUT_SECONDS:-600}"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../backend
+    environment:
+      OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
+      OLLAMA_CHAT_MODEL: "${OLLAMA_CHAT_MODEL:-}"
+      OLLAMA_EMBEDDING_MODEL: "${OLLAMA_EMBEDDING_MODEL:-embeddinggemma:300m}"
+      OLLAMA_TIMEOUT_SECONDS: "${OLLAMA_TIMEOUT_SECONDS:-180}"
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: "${QDRANT_COLLECTION:-rag_documents}"
+      RAG_CHUNK_SIZE: "${RAG_CHUNK_SIZE:-600}"
+      RAG_CHUNK_OVERLAP: "${RAG_CHUNK_OVERLAP:-80}"
+      RAG_TOP_K: "${RAG_TOP_K:-5}"
+      RAG_TEMPERATURE: "${RAG_TEMPERATURE:-0.2}"
+      RAG_CONTEXT_TOKENS: "${RAG_CONTEXT_TOKENS:-4096}"
+      RAG_ANSWER_TOKENS: "${RAG_ANSWER_TOKENS:-1024}"
+      MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-20971520}"
+      DOCUMENT_STORAGE_PATH: /app/data/documents
+    volumes:
+      - document_data:/app/data/documents
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/6333; printf 'GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; IFS= read -r response <&3; [[ \"$$response\" == *\" 200 \"* ]]"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+# Local block storage is required for Qdrant; ordinary NFS storage is unsuitable.
+volumes:
+  qdrant_data:
+  document_data:
