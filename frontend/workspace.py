@@ -5,9 +5,16 @@ from uuid import uuid4
 
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
+from streamlit.typing import ChatInputValue
 
 from api_client import BackendClient, BackendError
-from ui import backend_notice, format_file_size, initialise_preferences, show_sources
+from ui import (
+    backend_notice,
+    format_file_size,
+    initialise_preferences,
+    install_composer_behaviour,
+    show_sources,
+)
 
 
 def select_conversation(conversation_id: str) -> None:
@@ -23,6 +30,9 @@ def new_conversation(client: BackendClient) -> dict[str, Any]:
         int(st.session_state.get("top_k", 5)),
         float(st.session_state.get("temperature", 0.2)),
     )
+    if st.session_state.get("new_chat_use_library", False):
+        conversation = client.update_conversation(conversation["conversation_id"], use_library=True)
+    st.session_state.new_chat_use_library = False
     select_conversation(conversation["conversation_id"])
     return conversation
 
@@ -66,78 +76,154 @@ def conversation_rail(
         backend_notice()
 
 
-def chat_options(client: BackendClient, conversation: dict[str, Any]) -> None:
-    """Keep ordinary edits inline and require a deliberate destructive action."""
-    conversation_id = conversation["conversation_id"]
-    with st.popover("Chat options", icon=":material/more_horiz:"):
+def chat_options(
+    client: BackendClient,
+    conversation: dict[str, Any] | None,
+    names: list[str],
+) -> None:
+    """Keep model selection and infrequent edits together beside the composer."""
+    conversation_id = conversation["conversation_id"] if conversation else "new"
+    selected = conversation["model"] if conversation else st.session_state.get("selected_model")
+    with st.popover(
+        "Chat model and settings",
+        icon=":material/tune:",
+        help="Chat model and settings",
+        key="composer-settings",
+        width=40,
+    ):
+        st.markdown("**Chat model and settings**")
+        if names:
+            model = st.selectbox(
+                "Chat model",
+                names,
+                index=names.index(selected) if selected in names else None,
+                placeholder="Choose a local model",
+                key=f"model-{conversation_id}",
+            )
+            if model and model != selected:
+                if conversation:
+                    client.update_conversation(conversation_id, model=model)
+                else:
+                    st.session_state.selected_model = model
+                st.rerun()
+        else:
+            st.warning("No local chat models are available.")
         with st.form(f"options-{conversation_id}"):
-            title = st.text_input("Chat name", value=conversation["title"], max_chars=120)
+            title = (
+                st.text_input("Chat name", value=conversation["title"], max_chars=120)
+                if conversation
+                else None
+            )
             top_k = st.number_input(
                 "Maximum source excerpts",
                 min_value=1,
                 max_value=20,
-                value=conversation["top_k"],
+                value=int(
+                    conversation["top_k"] if conversation else st.session_state.get("top_k", 5)
+                ),
             )
             temperature = st.slider(
                 "Temperature",
                 min_value=0.0,
                 max_value=1.0,
-                value=float(conversation["temperature"]),
+                value=float(
+                    conversation["temperature"]
+                    if conversation
+                    else st.session_state.get("temperature", 0.2)
+                ),
                 step=0.05,
             )
             if st.form_submit_button("Save changes"):
-                client.update_conversation(
-                    conversation_id,
-                    title=title,
-                    top_k=top_k,
-                    temperature=temperature,
-                )
+                if conversation:
+                    client.update_conversation(
+                        conversation_id,
+                        title=title,
+                        top_k=top_k,
+                        temperature=temperature,
+                    )
+                else:
+                    st.session_state.top_k = top_k
+                    st.session_state.temperature = temperature
                 st.rerun()
-        st.divider()
-        st.caption("Deleting a chat also removes private files that no other chat uses.")
-        confirmed = st.checkbox(
-            "Delete this chat and its private files", key=f"confirm-chat-{conversation_id}"
-        )
-        if st.button("Delete chat", disabled=not confirmed, key="delete-chat"):
-            client.delete_conversation(conversation_id)
-            st.session_state.get("pending_submissions", {}).pop(conversation_id, None)
-            st.session_state.active_chat_id = None
-            st.query_params.pop("chat", None)
-            st.rerun()
+        if conversation:
+            st.divider()
+            st.caption("Deleting a chat also removes private files that no other chat uses.")
+            confirmed = st.checkbox(
+                "Delete this chat and its private files",
+                key=f"confirm-chat-{conversation_id}",
+            )
+            if st.button("Delete chat", disabled=not confirmed, key="delete-chat"):
+                client.delete_conversation(conversation_id)
+                st.session_state.get("pending_submissions", {}).pop(conversation_id, None)
+                st.session_state.active_chat_id = None
+                st.query_params.pop("chat", None)
+                st.rerun()
 
 
-def conversation_toolbar(
-    client: BackendClient,
-    conversation: dict[str, Any],
-    names: list[str],
-) -> None:
-    """Expose the two frequent decisions: local model and evidence scope."""
-    conversation_id = conversation["conversation_id"]
-    with st.container(horizontal=True, vertical_alignment="center", key="chat-toolbar"):
-        selected = conversation["model"]
-        index = names.index(selected) if selected in names else None
-        model = st.selectbox(
-            "Chat model",
-            names,
-            index=index,
-            placeholder="Choose a local model",
-            label_visibility="collapsed",
-            key=f"model-{conversation_id}",
-            width=260,
-        )
-        if model and model != selected:
-            client.update_conversation(conversation_id, model=model)
-            st.rerun()
+def library_options(client: BackendClient, conversation: dict[str, Any] | None) -> None:
+    """Make the shared evidence scope explicit and reachable without scrolling."""
+    conversation_id = conversation["conversation_id"] if conversation else "new"
+    included = bool(
+        conversation["use_library"]
+        if conversation
+        else st.session_state.get("new_chat_use_library", False)
+    )
+    with st.popover(
+        "Library sources",
+        icon=":material/library_books:",
+        key="composer-library",
+        help="Shared library included" if included else "Shared library excluded",
+        type="primary" if included else "secondary",
+        width=40,
+    ):
+        st.markdown("**Document library**")
         use_library = st.toggle(
             "Include library",
-            value=conversation["use_library"],
+            value=included,
             key=f"library-{conversation_id}",
             help="Also search documents deliberately added to the shared library.",
         )
-        if use_library != conversation["use_library"]:
-            client.update_conversation(conversation_id, use_library=use_library)
+        st.caption("Documents attached to this chat are always included.")
+        if use_library != included:
+            if conversation:
+                client.update_conversation(conversation_id, use_library=use_library)
+            else:
+                st.session_state.new_chat_use_library = use_library
             st.rerun()
-        chat_options(client, conversation)
+
+
+def composer(
+    client: BackendClient,
+    conversation: dict[str, Any] | None,
+    names: list[str],
+    disabled: bool,
+) -> str | ChatInputValue | None:
+    """Keep the input, model settings and evidence controls in one pinned surface."""
+    conversation_id = conversation["conversation_id"] if conversation else "new"
+    with st.bottom, st.container(key="composer-shell"):
+        prompt = st.chat_input(
+            "Ask about your documents, or attach files",
+            key=f"composer-{conversation_id}",
+            max_chars=8000,
+            accept_file="multiple",
+            file_type=["pdf", "docx", "txt", "md", "markdown"],
+            max_upload_size=20,
+            disabled=disabled,
+        )
+        with st.container(
+            horizontal=True,
+            vertical_alignment="center",
+            gap="small",
+            key="composer-tools",
+        ):
+            chat_options(client, conversation, names)
+            library_options(client, conversation)
+            model = (
+                conversation["model"] if conversation else st.session_state.get("selected_model")
+            )
+            st.caption(model or "Choose a local model")
+        install_composer_behaviour()
+    return prompt
 
 
 def show_attachments(client: BackendClient, conversation: dict[str, Any]) -> None:
@@ -245,23 +331,11 @@ def render_workspace() -> None:
                 client.delete_conversation(conversation["conversation_id"])
                 st.rerun()
             return
-        conversation_toolbar(client, conversation, names)
         show_attachments(client, conversation)
     else:
         st.caption(
             "Attach a document below, then ask a question. Chats are saved on this computer."
         )
-        if names:
-            model = st.selectbox(
-                "Chat model",
-                names,
-                index=names.index(st.session_state.selected_model),
-                width=300,
-                key="new-chat-model",
-            )
-            st.session_state.selected_model = model
-        else:
-            st.caption("Choose a local chat model when Ollama is available.")
     messages = conversation["messages"] if conversation else []
     with st.container(key="transcript"):
         for message in messages:
@@ -286,13 +360,10 @@ def render_workspace() -> None:
             if st.button("Discard draft", type="tertiary"):
                 del st.session_state.pending_submissions[pending["conversation_id"]]
                 st.rerun()
-    prompt = st.chat_input(
-        "Ask about your documents, or attach files",
-        key=f"composer-{active_id or 'new'}",
-        max_chars=8000,
-        accept_file="multiple",
-        file_type=["pdf", "docx", "txt", "md", "markdown"],
-        max_upload_size=20,
+    prompt = composer(
+        client,
+        conversation,
+        names,
         disabled=bool(pending and pending["conversation_id"] == active_id),
     )
     if prompt:

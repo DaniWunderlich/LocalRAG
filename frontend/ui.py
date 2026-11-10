@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
+import streamlit.components.v2 as components
 
 from api_client import BackendClient, BackendError
 
@@ -11,6 +12,18 @@ from api_client import BackendClient, BackendError
 def apply_design() -> None:
     """Apply local, shared design tokens without remote fonts or scripts."""
     st.html(Path(__file__).with_name("styles.css"))
+
+
+_composer_controller = components.component(
+    "localrag_composer",
+    js=Path(__file__).with_name("composer.js").read_text(encoding="utf-8"),
+    isolate_styles=False,
+)
+
+
+def install_composer_behaviour() -> None:
+    """Mount the trusted local scroll controller without interpolating user content."""
+    _composer_controller(key="composer-controller", height=0)
 
 
 def format_file_size(size_bytes: int) -> str:

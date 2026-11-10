@@ -23,7 +23,7 @@
 [data-testid="stAppViewContainer"] { color: var(--rag-text); }
 [data-testid="stMainBlockContainer"] {
   max-width: 1120px;
-  padding: var(--rag-shell-offset) var(--rag-space-8) 110px;
+  padding: var(--rag-shell-offset) var(--rag-space-8) 190px;
 }
 [data-testid="stSidebar"] { border-right: 1px solid var(--rag-border); }
 [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding-top: var(--rag-space-6); }
@@ -80,7 +80,6 @@ a:focus-visible, [role="combobox"]:focus-visible {
   outline-offset: 3px;
 }
 button:disabled { color: var(--rag-disabled); }
-.st-key-chat-toolbar { padding-bottom: var(--rag-space-3); border-bottom: 1px solid var(--rag-border); }
 .st-key-delete-chat button { color: var(--rag-error); border-color: var(--rag-error); }
 [data-testid="stBottom"] { background: var(--rag-background); }
 [data-testid="stBottomBlockContainer"] { max-width: 1000px; padding-bottom: var(--rag-space-4); }
@@ -91,15 +90,104 @@ button:disabled { color: var(--rag-disabled); }
 }
 [data-testid="stExpander"] { box-shadow: none; }
 @media (max-width: 768px) {
-  [data-testid="stMainBlockContainer"] { padding: var(--rag-shell-offset) var(--rag-space-4) 100px; }
+  [data-testid="stMainBlockContainer"] { padding: var(--rag-shell-offset) var(--rag-space-4) 190px; }
   .st-key-transcript { margin-top: var(--rag-space-4); }
 }
 @media (max-width: 480px) {
-  [data-testid="stMainBlockContainer"] { padding: var(--rag-shell-offset) var(--rag-space-4) 100px; }
+  [data-testid="stMainBlockContainer"] { padding: var(--rag-shell-offset) var(--rag-space-4) 190px; }
   h1 { font-size: 1.6rem !important; }
-  .st-key-chat-toolbar { gap: var(--rag-space-3); }
   [data-testid="stBottomBlockContainer"] { padding-inline: var(--rag-space-3); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* One pinned composing surface; pointer focus does not add a coloured frame. */
+.st-key-composer-shell {
+  position: relative;
+  border: 1px solid var(--rag-border, #d4d9d1);
+  border-radius: 9px;
+  background: var(--rag-surface, #ffffff);
+  padding: 4px 8px 8px;
+  gap: 0;
+}
+.st-key-composer-shell [data-testid="stChatInput"],
+.st-key-composer-shell [data-testid="stChatInput"]:focus-within {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent;
+}
+.st-key-composer-shell [data-baseweb="textarea"],
+.st-key-composer-shell [data-baseweb="textarea"]:focus-within,
+.st-key-composer-shell textarea,
+.st-key-composer-shell textarea:focus-visible {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.st-key-composer-tools { gap: 4px; padding-inline: 2px; }
+.st-key-composer-tools [data-testid="stCaptionContainer"] {
+  min-width: 0;
+  margin-left: 4px;
+}
+.st-key-composer-tools [data-testid="stCaptionContainer"] p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.st-key-composer-settings, .st-key-composer-library { flex: 0 0 40px; }
+.st-key-composer-settings button, .st-key-composer-library button {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 6px;
+}
+.st-key-composer-settings button:focus-visible,
+.st-key-composer-library button:focus-visible {
+  outline-color: var(--rag-muted, #59645d) !important;
+}
+#rag-jump-to-end {
+  position: absolute;
+  top: -48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--rag-border, #d4d9d1);
+  color: var(--rag-text, #232c28);
+  background: var(--rag-surface, #ffffff);
+  cursor: pointer;
+}
+#rag-jump-to-end[hidden] { display: none; }
+#rag-jump-to-end:hover { background: var(--rag-alternative, #eeede7); }
+#rag-jump-to-end:focus-visible {
+  outline: 2px solid var(--rag-muted, #59645d) !important;
+  outline-offset: 3px;
+}
+
+/* Keep meaningful native labels available to assistive technology. */
+.st-key-composer-settings button p, .st-key-composer-library button p {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.st-key-transcript { scroll-margin-bottom: 200px; }
+.st-key-transcript > :last-child { scroll-margin-bottom: 200px; }
+
+.st-key-composer-shell [data-testid="stChatInput"] > div,
+.st-key-composer-shell [data-testid="stChatInput"] > div:focus-within {
+  border-color: transparent !important;
+  background: transparent;
 }
