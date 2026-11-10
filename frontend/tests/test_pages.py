@@ -274,3 +274,54 @@ def test_failed_drafts_remain_with_their_original_chat() -> None:
         assert app.error[0].value == "Ollama is temporarily unavailable."
         assert app.session_state["pending_submissions"][first]["text"] == "The first question"
         assert second not in app.session_state["pending_submissions"]
+
+
+def test_model_and_library_controls_are_outside_the_scrolling_transcript() -> None:
+    with fake_backend() as backend:
+        chat_id = backend.create("chat:test", 5, 0.2)["conversation_id"]
+        app = AppTest.from_file(str(ROOT / "app.py"))
+        app.query_params["chat"] = chat_id
+        app.run()
+        assert not app.exception
+        assert len(app.main.selectbox) == 0
+        assert len(app.main.toggle) == 0
+        assert len(app.selectbox) == 1
+        assert len(app.toggle) == 1
+        assert len(app.chat_input) == 1
+
+
+def test_composer_model_selection_and_chat_options_update_the_same_thread() -> None:
+    with fake_backend() as backend:
+        chat_id = backend.create("chat:test", 5, 0.2)["conversation_id"]
+        other = backend.create("chat:test", 5, 0.2)["conversation_id"]
+        with patch.object(
+            BackendClient,
+            "models",
+            return_value={
+                "models": ["chat:test", "chat:alternative"],
+                "default_model": "chat:test",
+                "defaults": {"top_k": 5, "temperature": 0.2, "max_upload_bytes": 20971520},
+            },
+        ):
+            app = AppTest.from_file(str(ROOT / "app.py"))
+            app.query_params["chat"] = chat_id
+            app.run()
+            app.selectbox[0].set_value("chat:alternative").run()
+            assert backend.chats[chat_id]["model"] == "chat:alternative"
+            app.number_input[0].set_value(3)
+            next(button for button in app.button if button.label == "Save changes").click().run()
+            assert backend.chats[chat_id]["top_k"] == 3
+            assert backend.chats[other]["model"] == "chat:test"
+            assert backend.chats[other]["top_k"] == 5
+            assert not app.exception
+
+
+def test_library_choice_in_an_empty_composer_applies_to_the_created_chat() -> None:
+    with fake_backend() as backend:
+        app = AppTest.from_file(str(ROOT / "app.py")).run()
+        app.toggle[0].set_value(True).run()
+        assert backend.chats == {}
+        app.chat_input[0].set_value("Use the shared library").run()
+        assert not app.exception
+        assert next(iter(backend.chats.values()))["use_library"] is True
+        assert app.session_state["new_chat_use_library"] is False
