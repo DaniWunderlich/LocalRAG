@@ -59,15 +59,17 @@ def test_composer_placement_appearance_and_scroll(page: Page) -> None:
     buttons = [
         page.locator("#composer-settings"),
         page.locator("#composer-library"),
-        page.locator('#composer [data-testid="upload-button"]').first,
+        page.locator('#composer [data-testid="upload-button"]'),
+        page.locator('#composer [data-testid="submit-button"]'),
     ]
     positions = [button.bounding_box() for button in buttons]
     assert all(positions)
     assert positions[0] and positions[1] and positions[2]
     assert positions[0]["x"] < positions[1]["x"] < positions[2]["x"]
     assert (
-        max(item["y"] for item in positions if item) - min(item["y"] for item in positions if item)
-        < 8
+        max(item["y"] + item["height"] / 2 for item in positions if item)
+        - min(item["y"] + item["height"] / 2 for item in positions if item)
+        <= 0.5
     )
     composer = page.locator("#composer textarea")
     composer.fill("Draft remains while changing appearance")
@@ -114,6 +116,10 @@ def test_settings_library_and_source_disclosure(page: Page) -> None:
     )
     page.get_by_role("button", name="Include shared library", exact=True).click()
     expect(page.get_by_role("button", name="Exclude shared library", exact=True)).to_be_visible()
+    page.wait_for_function("""() => {
+        const image = document.querySelector('#composer-library img');
+        return image?.complete && image.naturalWidth > 0 && image.src.endsWith('library-check.svg');
+    }""")
     expect(page.locator("#composer textarea")).to_have_value(
         "Unsent question for the visual review"
     )
