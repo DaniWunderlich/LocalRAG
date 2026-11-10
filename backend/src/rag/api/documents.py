@@ -27,6 +27,8 @@ async def upload_document(services: Bundle, file: Annotated[UploadFile, File()])
                 "document_uploaded",
                 extra={"document_id": str(meta.document_id), "size_bytes": meta.size_bytes},
             )
+            if meta.status == "indexed":
+                return meta
             return await index_document(
                 meta,
                 services.registry,
@@ -41,7 +43,7 @@ async def upload_document(services: Bundle, file: Annotated[UploadFile, File()])
 @router.get("", response_model=list[DocumentMeta])
 async def list_documents(services: Bundle) -> list[DocumentMeta]:
     """Include failed documents so that users can retry or remove them."""
-    return services.registry.list()
+    return [meta for meta in services.registry.list() if meta.in_library]
 
 
 @router.get("/{document_id}", response_model=DocumentMeta)
@@ -62,5 +64,6 @@ async def delete_document(document_id: UUID, services: Bundle) -> Response:
         await services.qdrant.delete_document(document_id)
         services.registry.file_path(document_id).unlink(missing_ok=True)
         services.registry.delete(document_id)
+        services.prune_missing_attachments()
         logger.info("document_deleted", extra={"document_id": str(document_id)})
     return Response(status_code=204)

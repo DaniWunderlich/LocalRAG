@@ -20,6 +20,7 @@ class DocumentMeta(BaseModel):
     chunk_count: int = 0
     status: Literal["processing", "indexed", "failed", "deleting"] = "processing"
     error: str | None = None
+    in_library: bool = True
 
 
 class PageContent(BaseModel):
@@ -72,3 +73,88 @@ class ChatResponse(BaseModel):
 
     answer: str
     sources: list[Source]
+
+
+class HistoryMessage(BaseModel):
+    """A previous turn used to interpret a follow-up, without becoming evidence."""
+
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ConversationMessage(HistoryMessage):
+    """A durable message and its original evidence snapshot."""
+
+    message_id: UUID
+    created_at: datetime
+    sources: list[Source] = Field(default_factory=list)
+
+
+class Conversation(BaseModel):
+    """One independently configured, locally persisted conversation."""
+
+    conversation_id: UUID
+    title: str = "New chat"
+    automatic_title: bool = True
+    created_at: datetime
+    updated_at: datetime
+    model: str = ""
+    top_k: int = Field(default=5, ge=1, le=20)
+    temperature: float = Field(default=0.2, ge=0, le=1)
+    use_library: bool = False
+    document_ids: list[UUID] = Field(default_factory=list)
+    messages: list[ConversationMessage] = Field(default_factory=list)
+    status: Literal["active", "deleting"] = "active"
+
+
+class ConversationSummary(BaseModel):
+    """Lightweight navigation data without loading messages into the browser."""
+
+    conversation_id: UUID
+    title: str
+    updated_at: datetime
+    message_count: int
+    document_count: int
+    status: Literal["active", "deleting"]
+
+
+class ConversationCreate(BaseModel):
+    """Optional initial model, otherwise using the backend default."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model: str = Field(default="", max_length=200)
+    top_k: int | None = Field(default=None, ge=1, le=20)
+    temperature: float | None = Field(default=None, ge=0, le=1)
+
+
+class ConversationUpdate(BaseModel):
+    """Validated partial edits to a conversation's title and preferences."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    top_k: int | None = Field(default=None, ge=1, le=20)
+    temperature: float | None = Field(default=None, ge=0, le=1)
+    use_library: bool | None = None
+
+
+class ConversationSend(BaseModel):
+    """Idempotent submission of a question to one conversation."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    request_id: UUID
+    message: str = Field(min_length=1, max_length=8000)
+
+
+class ImportedMessage(HistoryMessage):
+    """A message from the original session-only frontend."""
+
+    content: str = Field(max_length=200000)
+    sources: list[Source] = Field(default_factory=list, max_length=20)
+
+
+class ConversationImport(ConversationCreate):
+    """Idempotently preserve a pre-upgrade browser transcript."""
+
+    conversation_id: UUID
+    messages: list[ImportedMessage] = Field(min_length=1, max_length=1000)

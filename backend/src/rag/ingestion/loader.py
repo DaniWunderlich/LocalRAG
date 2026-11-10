@@ -24,6 +24,7 @@ async def load_document(
     file: UploadFile,
     registry: DocumentRegistry,
     settings: Settings,
+    in_library: bool = True,
 ) -> DocumentMeta:
     """Validate before writing; retry failed hashes using the existing document ID."""
     filename = (file.filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
@@ -61,6 +62,11 @@ async def load_document(
     digest = hashlib.sha256(data).hexdigest()
     existing = registry.find_by_hash(digest)
     if existing is not None and existing.status != "failed":
+        if existing.status == "indexed" and (not in_library or not existing.in_library):
+            if in_library and not existing.in_library:
+                existing = existing.model_copy(update={"in_library": True})
+                registry.save(existing)
+            return existing
         raise AppError(
             f"This document already exists ({existing.document_id}).",
             409,
@@ -72,6 +78,7 @@ async def load_document(
         content_type=content_type,
         size_bytes=len(data),
         sha256=digest,
+        in_library=in_library or bool(existing and existing.in_library),
         uploaded_at=existing.uploaded_at if existing else datetime.now(UTC),
     )
     registry.save(meta)

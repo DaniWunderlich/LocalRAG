@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from rag.api import chat, documents, health, search
+from rag.api import chat, conversations, documents, health, search
 from rag.config import Settings
 from rag.errors import AppError
 from rag.providers.ollama import OllamaClient
@@ -75,7 +75,13 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             logger.removeHandler(handler)
 
     app = FastAPI(title="Local RAG", version="0.1.0", lifespan=lifespan)
-    for router in (documents.router, search.router, chat.router, health.router):
+    for router in (
+        documents.router,
+        search.router,
+        chat.router,
+        conversations.router,
+        health.router,
+    ):
         app.include_router(router)
 
     @app.exception_handler(AppError)

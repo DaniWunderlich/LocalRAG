@@ -3,6 +3,7 @@
 import json
 import logging
 from time import perf_counter
+from uuid import UUID
 
 from rag.config import Settings
 from rag.errors import AppError
@@ -22,10 +23,16 @@ async def retrieve_chunks(
     qdrant: QdrantProvider,
     registry: DocumentRegistry,
     settings: Settings,
+    document_ids: set[UUID] | None = None,
 ) -> list[Source]:
     """Embed a question and search only successfully indexed document IDs."""
     started = perf_counter()
-    ids = [meta.document_id for meta in registry.list() if meta.status == "indexed"]
+    ids = [
+        meta.document_id
+        for meta in registry.list()
+        if meta.status == "indexed"
+        and (meta.document_id in document_ids if document_ids is not None else meta.in_library)
+    ]
     if not ids:
         return []
     info = await ollama.model_info(settings.ollama_embedding_model, "embedding")
