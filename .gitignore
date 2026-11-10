@@ -1,0 +1,50 @@
+# ── Project documents (summarised in README) ──────────────────────────────────
+docs/VISION.md
+docs/SPEC.md
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── uv ─────────────────────────────────────────────────────────────────────────
+# Lock files are committed; do not ignore uv.lock
+
+# ── Type checking & linting caches ────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# ── Test caches ────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Environment files ──────────────────────────────────────────────────────────
+.env
+# .env.example is intentionally tracked
+
+# ── Runtime data ───────────────────────────────────────────────────────────────
+data/
+.tmp/
+
+# ── OS artefacts ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
