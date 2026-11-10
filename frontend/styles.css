@@ -23,8 +23,9 @@ h2 { font-size:21px !important; font-weight:500 !important; }
 #workspace-error { flex:0 0 auto; border-color:#a53131; }
 #workspace-tabs { flex:1 1 0; min-height:0; display:flex; flex-direction:column; }
 #workspace-tabs > .tabitem { flex:1 1 0; min-height:0; overflow:auto; padding:12px 0 0; }
-/* Tabs introduce a native column between the panel and the workspace. */
-#workspace-tabs > .tabitem > .column { height:100%; min-height:0; }
+/* Document panels grow naturally; only the chat fills the available height. */
+#workspace-tabs > .tabitem > .column { flex:0 0 auto; height:max-content; min-height:0; }
+#workspace-tabs > .tabitem:has(#conversation-workspace) > .column { height:100%; }
 #workspace-tabs .tab-nav button.selected { color:var(--rag-accent); border-color:var(--rag-accent); }
 #conversation-workspace { height:100%; min-height:0; max-width:1120px; margin:0 auto; gap:12px; }
 #chat-title { flex:0 0 auto; }
