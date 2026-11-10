@@ -1,0 +1,50 @@
+[project]
+name = "rag-backend"
+version = "0.1.0"
+description = "Local document ingestion, retrieval and grounded answer generation."
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "fastapi>=0.135",
+    "uvicorn[standard]>=0.41",
+    "httpx>=0.28",
+    "qdrant-client>=1.17",
+    "pypdf>=6.7",
+    "python-docx>=1.2",
+    "python-multipart>=0.0.22",
+    "pydantic-settings>=2.13",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2",
+    "pytest>=9",
+    "pytest-asyncio>=1",
+    "ruff>=0.15",
+    "mypy>=1.19",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rag"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = ["integration: requires an isolated Qdrant service"]
+addopts = "-m 'not integration'"
