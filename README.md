@@ -1,7 +1,7 @@
 # Local RAG
 
 A small, entirely local application for asking questions about your own documents.
-Streamlit provides the browser interface, FastAPI coordinates ingestion and RAG,
+Gradio provides the browser interface, FastAPI coordinates ingestion and RAG,
 Qdrant stores document vectors and excerpts, and an existing Ollama instance
 provides embeddings and chat completions. Documents and questions stay within
 your infrastructure. No cloud AI service or agent framework is required.
@@ -37,13 +37,14 @@ composer when later messages are out of view; select it to return to the latest
 message. Reduced-motion preferences are respected. Clicking the text field
 keeps its neutral border.
 
-Use the app menu at the top right to choose **Light**, **Dark** or **System**.
+Use the appearance buttons at the top right to choose **Light**, **Dark** or **System**.
 The browser remembers this preference across pages and reloads. Both appearances
 use the reading-desk palette throughout the chat, library, forms and dialogs.
 This preference is separate from saved chat settings.
 
-A transcript from the original session-only interface is imported into a saved
-chat when that browser session first runs the new interface. Successful message
+The v0.1.0 interface imported transcripts from the original session-only UI
+into saved chats. Gradio restores these backend records through the same API.
+Successful message
 submissions have stable request IDs, so retrying a timed-out request does not
 duplicate a committed exchange. Failed submissions retain a retryable browser
 draft. Browser reading preferences and new-chat defaults remain session-only.
@@ -99,7 +100,7 @@ include a question. Return to saved threads in the conversation rail. Expand
 not use these until **Include library** is enabled. The independent search API
 remains available for retrieval diagnostics.
 
-Only Streamlit is published, bound to `127.0.0.1:8501`. The backend and Qdrant
+Only the Gradio frontend is published, bound to `127.0.0.1:8501`. The backend and Qdrant
 remain inside the Compose network. This initial version has no authentication;
 keep it within a trusted local environment.
 
@@ -197,7 +198,7 @@ Configuration is read from environment variables and validated at startup.
 | `BACKEND_URL` | Native: `http://localhost:8000`; Compose: internal backend | Frontend HTTP destination |
 | `BACKEND_TIMEOUT_SECONDS` | `600` | Timeout for synchronous frontend requests |
 
-Streamlit also caps uploads at 20 MiB in `frontend/.streamlit/config.toml`.
+Gradio also caps temporary uploads at 20 MiB in `frontend/app.py`.
 Align that value if you deliberately increase the backend limit. Large or
 complex documents can exceed synchronous request timeouts; inspect their
 record before retrying.
@@ -270,7 +271,8 @@ preserved previous collection.
 
 Python is pinned to **3.14.7**. Backend and frontend have independent `uv.lock`
 files. The container build uses **uv 0.13.7** and **Qdrant 1.20.0**.
-The resolved baseline includes FastAPI 0.162.2, Streamlit 1.67.0, httpx 0.28.1,
+The backend baseline includes FastAPI 0.162.2, while the frontend pins Gradio
+6.31.0. Shared dependencies include httpx 0.28.1,
 qdrant-client 1.20.0, pypdf 7.0.0 and python-docx 1.2.0. Lockfiles contain the
 complete, platform-aware dependency set.
 
@@ -293,14 +295,17 @@ uv run pytest tests --basetemp=../.tmp/pytest-frontend -q
 
 The backend tests use a real ephemeral in-memory Qdrant implementation and
 mocked Ollama HTTP responses. They require no running LLM or external database.
-The frontend tests use Streamlit's application test runner and a backend double.
+The frontend tests exercise the session-scoped workspace commands against a
+backend double and check the native Gradio application. Optional Playwright
+tests exercise the actual UI against an isolated, seeded Compose stack.
 
 For native backend development, configure `QDRANT_URL`,
 `OLLAMA_BASE_URL=http://localhost:11434` and a local document path, then run
 `uv run --project backend uvicorn rag.main:app --reload`.
 For the frontend, change into `frontend/` and run
-`uv run streamlit run app.py` so that Streamlit also loads its local theme
-configuration.
+`uv run uvicorn app:app --host 127.0.0.1 --port 8501`. The native frontend health
+endpoint is `/health/live`. The container listens internally on port 7860;
+Compose retains the existing external port 8501, or your `FRONTEND_PORT` override.
 
 For container development with source reload:
 
@@ -356,8 +361,7 @@ muted-text styling. Controls retain native labels and keyboard semantics, with
 visible focus rules and reduced-motion support. This is not a full independent
 WCAG conformance audit.
 
-The current automated suite has 69 backend tests and 12 Streamlit interaction
-tests. It covers private evidence isolation, explicit library opt-in,
+The offline automated suite has 69 backend tests and 18 frontend tests. It covers private evidence isolation, explicit library opt-in,
 shared-content deduplication, follow-up context, durable settings, safe deletion,
 interrupted-operation recovery, idempotent sends, composer uploads, isolated
 retry drafts, composer settings and import of the original session-only transcript.
@@ -370,11 +374,77 @@ restarting the test containers, and `cleanup`. It checks two real grounded
 turns using local Ollama, persistence of all 14 test chats, evidence isolation
 and preservation of shared-library originals during chat deletion.
 
-The composer controls were additionally reviewed on desktop and at 390 px using
-an isolated 24-message chat. The review covered focus styling, the settings
-dialog, direct library opt-in without losing a draft, appearance changes in
-both directions, and returning to the latest message after scrolling upwards.
-The local controllers use Streamlit's component lifecycle and contain no
-user-provided code or remote scripts. Shared surface colours track the native
-component theme variables directly, without waiting for a Python rerun.
-Streamlit 1.67 or later is required for the pinned bottom container.
+The Gradio migration retains the reading column, conversation rail, private
+attachments, source disclosures, direct library icon, settings dialog and
+jump-to-latest control. Appearance uses the matching light and dark palette
+with a locally stored Light, Dark or System choice. Temporary uploads are
+restricted to Gradio's upload cache and capped before backend ingestion.
+Telemetry, public share tunnels, monitoring, MCP and server-side rendering are
+disabled. The frontend serves local assets and system fonts.
+
+## Gradio migration and browser acceptance
+
+Version 0.2.0 development replaces the Streamlit frontend from the published
+v0.1.0 baseline. Backend endpoints, document records, conversation records,
+Qdrant configuration, model compatibility and existing volumes are unchanged.
+No reindexing or data conversion is required. The original vision and initial
+specification describe the v0.1.0 stack; this frontend decision supersedes their
+Streamlit references.
+
+The new UI uses a Gradio `State` per browser session. It restores saved chats
+through the backend and keeps the selected chat addressable through `?chat=...`.
+Live drafts remain separate when switching chats. A failed submission retains
+its original request ID and resumes only the remaining uploads. Drafts and
+unfinished browser requests are temporary and do not survive a frontend restart;
+committed messages and documents remain in the backend volume. Gradio's temporary
+upload cache is cleaned periodically after 24 hours. Reattach expired uploads.
+
+Update an existing local installation without changing its backend or volumes:
+
+```powershell
+docker compose up -d --build --no-deps --wait frontend
+```
+
+Keep the original v0.1.0 checkout or frontend image available if you need to
+restore that UI. Both frontends use the same saved-chat API and storage format.
+
+For real-service and browser acceptance, create a disposable project containing
+only artificial documents. Use the existing local Ollama service:
+
+```powershell
+$env:FRONTEND_PORT = "18501"
+docker compose --env-file .env -f deploy/compose.yaml -p localrag-gradio-review up -d --build --wait
+Get-Content -Raw scripts/acceptance_gradio.py | docker compose --env-file .env -f deploy/compose.yaml -p localrag-gradio-review exec -T frontend python - initialise
+```
+
+The controller acceptance checks real uploads, two grounded turns, an interrupted
+response after commit, idempotent retry, private evidence isolation and distinct
+unsent drafts. It prints the address of a seeded 24-message visual review chat.
+Set `GRADIO_E2E_URL` to that complete address before running browser tests:
+
+```powershell
+uv run --project frontend playwright install chromium
+$env:GRADIO_E2E_URL = "http://localhost:18501/?chat=ID_FROM_ACCEPTANCE_OUTPUT"
+uv run --project frontend pytest frontend/tests/test_browser.py --basetemp=.tmp/pytest-gradio-browser -q
+```
+
+The twelve browser checks cover desktop, tablet and mobile widths (1440, 768 and
+390 px), icon alignment, focus and dialogs, appearance changes, draft retention,
+source disclosures, file-only uploads, per-chat drafts and the scroll control. Screenshots are
+written under `.tmp/gradio-browser/`. These tests are skipped when the URL is
+unset. Use only the disposable test project: browser checks deliberately create
+chat records and upload artificial files.
+
+Restart the test containers and verify that the original saved records survive:
+
+```powershell
+docker compose --env-file .env -f deploy/compose.yaml -p localrag-gradio-review restart
+docker compose --env-file .env -f deploy/compose.yaml -p localrag-gradio-review up -d --wait
+Get-Content -Raw scripts/acceptance_gradio.py | docker compose --env-file .env -f deploy/compose.yaml -p localrag-gradio-review exec -T frontend python - verify
+docker compose --env-file .env -f deploy/compose.yaml -p localrag-gradio-review down --volumes
+Remove-Item Env:FRONTEND_PORT
+Remove-Item Env:GRADIO_E2E_URL
+```
+
+Volume removal in this example applies exclusively to the disposable test
+project. Preserve the normal `localrag` project's volumes throughout migration.
