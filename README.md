@@ -425,14 +425,17 @@ Set `GRADIO_E2E_URL` to that complete address before running browser tests:
 ```powershell
 uv run --project frontend playwright install chromium
 $env:GRADIO_E2E_URL = "http://localhost:18501/?chat=ID_FROM_ACCEPTANCE_OUTPUT"
-uv run --project frontend pytest frontend/tests/test_browser.py --basetemp=.tmp/pytest-gradio-browser -q
+uv run --project frontend pytest frontend/tests/test_browser.py frontend/tests/test_ui_regressions.py --basetemp=.tmp/pytest-gradio-browser -q
 ```
 
-The twelve browser checks cover desktop, tablet and mobile widths (1440, 768 and
-390 px), icon alignment, focus and dialogs, appearance changes, draft retention,
-source disclosures, file-only uploads, per-chat drafts and the scroll control. Screenshots are
-written under `.tmp/gradio-browser/`. These tests are skipped when the URL is
-unset. Use only the disposable test project: browser checks deliberately create
+The sixteen browser checks cover desktop, tablet and mobile widths (1440, 906,
+768 and 390 px), icon alignment with multiline drafts and attachments, loaded
+library icons after repeated toggles, modal layering above the open sidebar,
+focus isolation, appearance changes, draft retention, source disclosures,
+file-only uploads, per-chat drafts and the scroll control. Regression cases also
+render at a device scale factor of 1.25 in light and dark appearances. Screenshots
+are written under `.tmp/gradio-browser/` and `.tmp/gradio-ui-fixes/`. These tests
+are skipped when the URL is unset. Use only the disposable test project: browser checks deliberately create
 chat records and upload artificial files.
 
 Restart the test containers and verify that the original saved records survive:
