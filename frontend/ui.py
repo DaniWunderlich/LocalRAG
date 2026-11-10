@@ -12,6 +12,14 @@ from api_client import BackendClient, BackendError
 def apply_design() -> None:
     """Apply local, shared design tokens without remote fonts or scripts."""
     st.html(Path(__file__).with_name("styles.css"))
+    _theme_controller(key="appearance-controller", height=0)
+
+
+_theme_controller = components.component(
+    "localrag_appearance",
+    js=Path(__file__).with_name("theme.js").read_text(encoding="utf-8"),
+    isolate_styles=False,
+)
 
 
 _composer_controller = components.component(

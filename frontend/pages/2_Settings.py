@@ -8,6 +8,12 @@ from ui import backend_notice, initialise_preferences
 st.title("Settings")
 st.caption("Each saved chat keeps its own model, document scope and generation settings.")
 
+st.subheader("Appearance")
+st.caption(
+    "Open the app menu at the top right to choose Light, Dark or System. "
+    "Your browser remembers the choice across pages and reloads."
+)
+
 try:
     names = initialise_preferences()
 except BackendError as error:
