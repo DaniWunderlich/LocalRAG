@@ -14,9 +14,24 @@ sources supplied to the model; and delete originals together with their vectors.
 Uploads are indexed synchronously. Duplicate content is detected using SHA-256.
 Re-uploading a failed document retries its existing record.
 
-Chat preferences and the displayed conversation last for the current browser
-session. Each backend question is independent: earlier conversation messages are
-not included in the prompt. There is no persistent chat history.
+Multiple independent chats are saved locally, including transcripts, evidence
+snapshots, attachment links, model choice and generation settings. Create,
+switch, search, rename and delete chats from the conversation workspace.
+Recent turns are included within a bounded history budget to interpret
+follow-up questions; factual answers still rely on the current source excerpts.
+
+Attach PDF, DOCX, TXT or Markdown directly to the chat composer, with or without
+a question. Attachments are private to that conversation. Switch on **Include
+library** to also search deliberately shared library documents. Identical files
+are stored and indexed once, while their conversation links remain separate.
+Deleting a chat removes its unshared private originals and vectors, and keeps
+documents still used by another chat or the shared library.
+
+A transcript from the original session-only interface is imported into a saved
+chat when that browser session first runs the new interface. Successful message
+submissions have stable request IDs, so retrying a timed-out request does not
+duplicate a committed exchange. Failed submissions retain a retryable browser
+draft. Browser reading preferences and new-chat defaults remain session-only.
 
 OCR, authentication, hybrid search, reranking, agents, multiple backend replicas
 and Kubernetes manifests are outside the initial scope.
@@ -60,10 +75,14 @@ For an existing `.env` without those Compose variables, use the explicit form:
 docker compose --env-file .env -f deploy/compose.yaml -p localrag up -d --build --wait
 ```
 
-Open [Local RAG](http://localhost:8501), upload a document on **Documents**,
-select an installed chat model and ask a question. Expand a source to inspect
-its excerpt, document location and similarity score. **Inspect document search**
-lets you assess retrieval without generating an answer.
+Open [Local RAG](http://localhost:8501), choose a local chat model and attach
+a document using the paperclip in the composer. Send the file on its own or
+include a question. Return to saved threads in the conversation rail. Expand
+**Sources** to inspect the evidence actually supplied with each answer.
+
+**Library** manages documents that may be shared across chats. A new chat does
+not use these until **Include library** is enabled. The independent search API
+remains available for retrieval diagnostics.
 
 Only Streamlit is published, bound to `127.0.0.1:8501`. The backend and Qdrant
 remain inside the Compose network. This initial version has no authentication;
@@ -88,15 +107,16 @@ A plain restart does not rebuild application code.
 | `backend/src/rag/generation/` | Grounded prompts and source mapping |
 | `backend/src/rag/providers/` | Ollama HTTP and Qdrant adapters |
 | `backend/src/rag/storage/` | Original files and atomic JSON metadata |
-| `frontend/` | Streamlit pages and a shared backend HTTP client |
+| `frontend/` | Conversation workspace, shared design tokens and backend HTTP client |
 | `deploy/` | Compose deployment and source-mount development overrides |
 | `backend/tests/`, `frontend/tests/` | Offline API, ingestion, provider, persistence and UI tests |
 | `scripts/`, `eval/` | Real-service acceptance checks and a 16-question evaluation corpus |
 
-The original [vision](docs/VISION.md) and [specification](docs/SPEC.md) remain
-the source documents and are retained without rewriting their requirements.
+The original [vision](docs/VISION.md) and [specification](docs/SPEC.md) are kept
+as the initial baseline. The conversation workspace, persistent history and
+per-chat document scope are subsequent requested extensions described here.
 
-One backend process serialises document mutations and retrieval snapshots.
+One backend process serialises document mutations, conversation writes and retrieval snapshots.
 Originals are stored under internal UUIDs rather than uploaded filenames.
 Document metadata is committed using a flushed temporary file and atomic
 replacement. Only records with status `indexed` participate in retrieval.
@@ -175,6 +195,12 @@ record before retrying.
 | GET / DELETE | `/api/v1/documents/{id}` | Inspect / completely remove a document |
 | POST | `/api/v1/search` | Retrieve ranked excerpts and metadata |
 | POST | `/api/v1/chat` | Generate an answer with the supplied context sources |
+| GET / POST | `/api/v1/conversations` | List / create persistent chats |
+| GET / PATCH / DELETE | `/api/v1/conversations/{id}` | Restore, rename, configure or delete a chat |
+| GET / POST | `/api/v1/conversations/{id}/documents` | Inspect / upload private chat attachments |
+| DELETE | `/api/v1/conversations/{id}/documents/{document_id}` | Detach a document and clean up unshared originals |
+| POST | `/api/v1/conversations/{id}/messages` | Idempotent question with bounded chat history |
+| POST | `/api/v1/conversations/import` | Preserve a pre-upgrade browser transcript |
 | GET | `/api/v1/models` | Local completion models and UI defaults |
 | GET | `/health/live` | Process liveness, independent of external services |
 | GET | `/health/ready` | Storage, Ollama, embedding model and compatible index readiness |
@@ -188,8 +214,9 @@ record operation outcomes and durations without complete questions or excerpts.
 
 ## Persistence, backups and controlled reindexing
 
-The `document_data` volume contains original files, `registry.json` and any
-reindex registry backups. The `qdrant_data` volume contains vectors, payloads
+The `document_data` volume contains original files, `registry.json`, per-chat
+records under `chats/` and any reindex registry backups. Back up chat records
+together with the document register; they include message and evidence history. The `qdrant_data` volume contains vectors, payloads
 and collection configuration. Both survive normal restarts and `down`.
 Qdrant needs suitable local block storage rather than an ordinary NFS volume.
 
@@ -256,7 +283,9 @@ The frontend tests use Streamlit's application test runner and a backend double.
 For native backend development, configure `QDRANT_URL`,
 `OLLAMA_BASE_URL=http://localhost:11434` and a local document path, then run
 `uv run --project backend uvicorn rag.main:app --reload`.
-For the frontend, run `uv run --project frontend streamlit run frontend/app.py`.
+For the frontend, change into `frontend/` and run
+`uv run streamlit run app.py` so that Streamlit also loads its local theme
+configuration.
 
 For container development with source reload:
 
@@ -295,3 +324,33 @@ representative corpus before changing retrieval or chunking strategies.
 The exact token count, answer quality and citation compliance remain
 model-dependent. Kubernetes deployment and horizontal scaling require
 separate work; the current JSON registry supports one backend instance.
+
+## Conversation workspace validation
+
+The interface uses a compact conversation rail, a bounded reading column,
+inline attachments and progressively disclosed sources and chat options.
+Paper, ink and evergreen colours, local system fonts and restrained borders
+provide a consistent visual language without dashboard metrics or decorative
+cards. The local design notes in `docs/DESIGN.md` are intentionally ignored
+by Git.
+
+Rendered screens were reviewed at 1440, 768 and 390 px, including the populated
+conversation, a 14-chat navigation list, the mobile drawer and library upload
+form. The review corrected the clearance below fixed navigation and strengthened
+muted-text styling. Controls retain native labels and keyboard semantics, with
+visible focus rules and reduced-motion support. This is not a full independent
+WCAG conformance audit.
+
+The current automated suite has 69 backend tests and nine Streamlit interaction
+tests. It covers private evidence isolation, explicit library opt-in,
+shared-content deduplication, follow-up context, durable settings, safe deletion,
+interrupted-operation recovery, idempotent sends, composer uploads, isolated
+retry drafts and import of the original session-only transcript.
+
+For the additional real-service acceptance run, use the disposable
+`localrag-design-review` project with `FRONTEND_PORT=18501`, and run
+`scripts/acceptance_chats.py` inside its backend through the same stdin pipeline
+as the initial acceptance script. Its phases are `initialise`, `verify` after
+restarting the test containers, and `cleanup`. It checks two real grounded
+turns using local Ollama, persistence of all 14 test chats, evidence isolation
+and preservation of shared-library originals during chat deletion.
