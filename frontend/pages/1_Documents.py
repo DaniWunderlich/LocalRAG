@@ -1,52 +1,86 @@
-"""Upload, inspect, retry and remove original documents."""
+"""A compact shared library, distinct from private conversation attachments."""
 
 import streamlit as st
 
 from api_client import BackendClient, BackendError
+from ui import format_file_size, show_sources
 
-st.set_page_config(page_title="Documents ? Local RAG", page_icon="??")
-st.title("Documents")
-st.caption("PDF, DOCX, UTF-8 TXT and Markdown. Scanned PDFs require OCR and are not supported.")
+st.title("Document library")
+st.caption(
+    "Documents here can be included in any chat. Chat attachments stay with their conversation."
+)
 client = BackendClient()
 
-with st.form("upload", clear_on_submit=True):
-    file = st.file_uploader("Choose a document", type=["pdf", "docx", "txt", "md", "markdown"])
-    submitted = st.form_submit_button("Upload and index")
-if submitted and file is not None:
-    try:
-        with st.spinner("Reading and indexing the document?"):
-            document = client.upload(file.name, file.getvalue(), file.type)
-        st.success(f"Indexed {document['filename']} ({document['chunk_count']} chunks).")
-    except BackendError as error:
-        st.error(str(error))
+with st.expander("Add documents", icon=":material/add:"):
+    with st.form("library-upload", clear_on_submit=True):
+        files = st.file_uploader(
+            "Choose documents",
+            type=["pdf", "docx", "txt", "md", "markdown"],
+            accept_multiple_files=True,
+        )
+        submitted = st.form_submit_button("Add to library")
+    if submitted and files:
+        for file in files:
+            try:
+                with st.spinner(f"Indexing {file.name}..."):
+                    document = client.upload(file.name, file.getvalue(), file.type)
+                st.success(f"{document['filename']} is ready.")
+            except BackendError as error:
+                st.error(f"{file.name}: {error}")
+    st.caption("Up to 20 MiB per file. PDF, DOCX, UTF-8 text and Markdown; no OCR.")
 
-st.caption("To retry a failed indexing operation, upload the same file again.")
 try:
     documents = client.documents()
 except BackendError as error:
     st.error(str(error))
     st.stop()
 
+query = st.text_input(
+    "Find a document", placeholder="Find a document", label_visibility="collapsed"
+)
+visible = [item for item in documents if query.casefold() in item["filename"].casefold()]
 if not documents:
-    st.info("No documents have been uploaded yet.")
-for document in documents:
-    with st.container(border=True):
-        st.text(document["filename"])
-        st.caption(
-            f"{document['content_type']} ? {document['size_bytes'] / 1024:.1f} KiB ? "
-            f"{document['chunk_count']} chunks ? {document['status']} ? {document['uploaded_at']}"
-        )
-        if document.get("error"):
-            st.warning(document["error"])
-        confirmed = st.checkbox(
-            "Remove this document and its index", key=f"confirm-{document['document_id']}"
-        )
-        if st.button(
-            "Delete document", key=f"delete-{document['document_id']}", disabled=not confirmed
-        ):
-            try:
-                with st.spinner("Removing the document?"):
-                    client.delete(document["document_id"])
-                st.rerun()
-            except BackendError as error:
-                st.error(str(error))
+    st.info(
+        "The shared library is empty. Add documents here, or attach private files inside a chat."
+    )
+elif not visible:
+    st.caption("No documents match your search.")
+for document in visible:
+    st.divider()
+    with st.container(horizontal=True, vertical_alignment="center"):
+        with st.container():
+            st.text(document["filename"])
+            extension = document["filename"].rsplit(".", 1)[-1].upper()
+            st.caption(
+                f"{extension} · {format_file_size(document['size_bytes'])} · "
+                f"{document['chunk_count']} excerpts · {document['status']}"
+            )
+        with st.popover("Delete", key=f"delete-library-{document['document_id']}"):
+            st.caption(
+                "Delete the original and its index? Existing chat messages keep their historical source excerpts."
+            )
+            if st.button("Delete document", key=f"delete-{document['document_id']}"):
+                try:
+                    with st.spinner("Removing the document..."):
+                        client.delete(document["document_id"])
+                    st.rerun()
+                except BackendError as error:
+                    st.error(str(error))
+    if document.get("error"):
+        st.warning(document["error"])
+st.caption("Re-upload a failed file to retry indexing.")
+
+with st.expander("Search library", icon=":material/search:"):
+    with st.form("library-search"):
+        search_query = st.text_input("Question or search terms")
+        search_submitted = st.form_submit_button("Find excerpts")
+    if search_submitted and search_query.strip():
+        try:
+            with st.spinner("Searching the shared library..."):
+                sources = client.search(search_query, int(st.session_state.get("top_k", 5)))
+            if sources:
+                show_sources(sources)
+            else:
+                st.info("No shared-library excerpts were found.")
+        except BackendError as error:
+            st.error(str(error))

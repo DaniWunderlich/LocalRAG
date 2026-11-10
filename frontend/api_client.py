@@ -86,3 +86,105 @@ class BackendClient:
             },
         )
         return result
+
+    def conversations(self) -> list[dict[str, Any]]:
+        """List saved threads without transferring their transcripts."""
+        result: list[dict[str, Any]] = self.request("GET", "/api/v1/conversations")
+        return result
+
+    def conversation(self, conversation_id: str) -> dict[str, Any]:
+        """Restore one conversation and its independently saved preferences."""
+        result: dict[str, Any] = self.request("GET", f"/api/v1/conversations/{conversation_id}")
+        return result
+
+    def create_conversation(self, model: str, top_k: int, temperature: float) -> dict[str, Any]:
+        """Create a new durable conversation with explicit initial defaults."""
+        result: dict[str, Any] = self.request(
+            "POST",
+            "/api/v1/conversations",
+            json={
+                "model": model,
+                "top_k": top_k,
+                "temperature": temperature,
+            },
+        )
+        return result
+
+    def update_conversation(self, conversation_id: str, **fields: Any) -> dict[str, Any]:
+        """Change only the selected conversation's supplied fields."""
+        result: dict[str, Any] = self.request(
+            "PATCH",
+            f"/api/v1/conversations/{conversation_id}",
+            json=fields,
+        )
+        return result
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Remove one thread and its unshared private attachments."""
+        self.request("DELETE", f"/api/v1/conversations/{conversation_id}")
+
+    def attachments(self, conversation_id: str) -> list[dict[str, Any]]:
+        """Return the saved attachments of the selected conversation."""
+        result: list[dict[str, Any]] = self.request(
+            "GET",
+            f"/api/v1/conversations/{conversation_id}/documents",
+        )
+        return result
+
+    def upload_attachment(
+        self,
+        conversation_id: str,
+        filename: str,
+        data: bytes,
+        content_type: str,
+    ) -> dict[str, Any]:
+        """Index or reuse a file within this chat's private evidence scope."""
+        result: dict[str, Any] = self.request(
+            "POST",
+            f"/api/v1/conversations/{conversation_id}/documents",
+            files={"file": (filename, data, content_type)},
+        )
+        return result
+
+    def detach(self, conversation_id: str, document_id: str) -> None:
+        """Remove an attachment link and any unshared private original."""
+        self.request(
+            "DELETE",
+            f"/api/v1/conversations/{conversation_id}/documents/{document_id}",
+        )
+
+    def send_message(
+        self,
+        conversation_id: str,
+        message: str,
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Idempotently submit one question using the saved chat settings."""
+        result: dict[str, Any] = self.request(
+            "POST",
+            f"/api/v1/conversations/{conversation_id}/messages",
+            json={"message": message, "request_id": request_id},
+        )
+        return result
+
+    def import_conversation(
+        self,
+        conversation_id: str,
+        messages: list[dict[str, Any]],
+        model: str,
+        top_k: int,
+        temperature: float,
+    ) -> dict[str, Any]:
+        """Preserve a session-only transcript without regenerating its answers."""
+        result: dict[str, Any] = self.request(
+            "POST",
+            "/api/v1/conversations/import",
+            json={
+                "conversation_id": conversation_id,
+                "messages": messages,
+                "model": model,
+                "top_k": top_k,
+                "temperature": temperature,
+            },
+        )
+        return result

@@ -3,3 +3,27 @@ gatherUsageStats = false
 
 [server]
 maxUploadSize = 20
+
+[client]
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#245B49"
+backgroundColor = "#FAF9F6"
+secondaryBackgroundColor = "#EEEDE7"
+textColor = "#232C28"
+font = "Segoe UI, system-ui, sans-serif"
+headingFont = "Georgia, serif"
+headingFontSizes = ["1.85rem", "1.4rem", "1.15rem"]
+headingFontWeights = [500, 500, 600]
+codeFont = "Cascadia Code, Consolas, monospace"
+baseRadius = "0.3rem"
+buttonRadius = "0.3rem"
+borderColor = "#D4D9D1"
+showWidgetBorder = true
+
+[theme.sidebar]
+backgroundColor = "#EEEDE7"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#232C28"
