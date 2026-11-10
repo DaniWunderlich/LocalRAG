@@ -1,0 +1,190 @@
+[
+  {
+    "id": "orion-weekday",
+    "question": "On which weekday does Project Orion launch?",
+    "expected_documents": [
+      "orion.txt"
+    ],
+    "expected_terms": [
+      "Friday"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "orion-manager",
+    "question": "Who is the release manager for Project Orion?",
+    "expected_documents": [
+      "orion.txt"
+    ],
+    "expected_terms": [
+      "Alice"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "orion-role",
+    "question": "Which project does Alice manage the release for?",
+    "expected_documents": [
+      "orion.txt"
+    ],
+    "expected_terms": [
+      "Orion"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "harbour-retention",
+    "question": "How long are Harbour backups retained?",
+    "expected_documents": [
+      "harbour.md"
+    ],
+    "expected_terms": [
+      "seven days"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "harbour-system",
+    "question": "Which system has a seven-day backup retention period?",
+    "expected_documents": [
+      "harbour.md"
+    ],
+    "expected_terms": [
+      "Harbour"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "harbour-deletion",
+    "question": "Are Harbour backups kept for a month?",
+    "expected_documents": [
+      "harbour.md"
+    ],
+    "expected_terms": [
+      "seven days"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "atlas-time",
+    "question": "At what time does the Atlas support desk open?",
+    "expected_documents": [
+      "atlas.docx"
+    ],
+    "expected_terms": [
+      "09:30"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "atlas-days",
+    "question": "On which days does Atlas support open?",
+    "expected_documents": [
+      "atlas.docx"
+    ],
+    "expected_terms": [
+      "weekdays"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "atlas-name",
+    "question": "Which support desk opens at 09:30?",
+    "expected_documents": [
+      "atlas.docx"
+    ],
+    "expected_terms": [
+      "Atlas"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "cedar-location",
+    "question": "Where is the Cedar emergency assembly point?",
+    "expected_documents": [
+      "cedar.pdf"
+    ],
+    "expected_terms": [
+      "north gate"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "cedar-gate",
+    "question": "Which gate should Cedar staff assemble at in an emergency?",
+    "expected_documents": [
+      "cedar.pdf"
+    ],
+    "expected_terms": [
+      "north"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "cedar-purpose",
+    "question": "What is the north gate used for at Cedar?",
+    "expected_documents": [
+      "cedar.pdf"
+    ],
+    "expected_terms": [
+      "assembly"
+    ],
+    "answerable": true,
+    "top_k": 1
+  },
+  {
+    "id": "combined-release-backups",
+    "question": "State the Orion launch weekday and Harbour backup retention.",
+    "expected_documents": [
+      "orion.txt",
+      "harbour.md"
+    ],
+    "expected_terms": [
+      "Friday",
+      "seven days"
+    ],
+    "answerable": true,
+    "top_k": 2
+  },
+  {
+    "id": "combined-support-emergency",
+    "question": "State the Atlas support opening time and Cedar assembly point.",
+    "expected_documents": [
+      "atlas.docx",
+      "cedar.pdf"
+    ],
+    "expected_terms": [
+      "09:30",
+      "north gate"
+    ],
+    "answerable": true,
+    "top_k": 2
+  },
+  {
+    "id": "unsupported-budget",
+    "question": "What is the budget for Project Orion?",
+    "expected_documents": [],
+    "expected_terms": [],
+    "answerable": false,
+    "top_k": 1
+  },
+  {
+    "id": "unsupported-weekend",
+    "question": "What time does the Atlas desk open on Sunday?",
+    "expected_documents": [],
+    "expected_terms": [],
+    "answerable": false,
+    "top_k": 1
+  }
+]

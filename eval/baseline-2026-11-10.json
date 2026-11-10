@@ -1,0 +1,658 @@
+{
+  "answerable_cases": 14,
+  "retrieval_passes": 14,
+  "chat_model": "granite3.3:8b",
+  "results": [
+    {
+      "id": "orion-weekday",
+      "question": "On which weekday does Project Orion launch?",
+      "expected_documents": [
+        "orion.txt"
+      ],
+      "expected_terms": [
+        "Friday"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "orion.txt"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "Project Orion launches on Friday. [Source 1]",
+        "sources": [
+          {
+            "page": null,
+            "section": null,
+            "text": "Project Orion launches on Friday. The release manager is Alice.",
+            "source_id": 1,
+            "chunk_id": "5d256686-125a-5b3e-bd61-10e388811d70",
+            "document_id": "00d9e32d-b9d2-4fc5-8b95-1635607ec2e1",
+            "filename": "orion.txt",
+            "chunk_index": 0,
+            "score": 0.7797777,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "orion-manager",
+      "question": "Who is the release manager for Project Orion?",
+      "expected_documents": [
+        "orion.txt"
+      ],
+      "expected_terms": [
+        "Alice"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "orion.txt"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "The release manager for Project Orion is Alice. [Source 1]",
+        "sources": [
+          {
+            "page": null,
+            "section": null,
+            "text": "Project Orion launches on Friday. The release manager is Alice.",
+            "source_id": 1,
+            "chunk_id": "5d256686-125a-5b3e-bd61-10e388811d70",
+            "document_id": "00d9e32d-b9d2-4fc5-8b95-1635607ec2e1",
+            "filename": "orion.txt",
+            "chunk_index": 0,
+            "score": 0.845195,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "orion-role",
+      "question": "Which project does Alice manage the release for?",
+      "expected_documents": [
+        "orion.txt"
+      ],
+      "expected_terms": [
+        "Orion"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "orion.txt"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "Alice manages the release for Project Orion. [Source 1]",
+        "sources": [
+          {
+            "page": null,
+            "section": null,
+            "text": "Project Orion launches on Friday. The release manager is Alice.",
+            "source_id": 1,
+            "chunk_id": "5d256686-125a-5b3e-bd61-10e388811d70",
+            "document_id": "00d9e32d-b9d2-4fc5-8b95-1635607ec2e1",
+            "filename": "orion.txt",
+            "chunk_index": 0,
+            "score": 0.76649654,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "harbour-retention",
+      "question": "How long are Harbour backups retained?",
+      "expected_documents": [
+        "harbour.md"
+      ],
+      "expected_terms": [
+        "seven days"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "harbour.md"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "Harbour backups are retained for seven days. [Source 1]",
+        "sources": [
+          {
+            "page": null,
+            "section": "Harbour backups",
+            "text": "# Harbour backups\n\nHarbour backups are retained for seven days.",
+            "source_id": 1,
+            "chunk_id": "cc716220-39a8-56ee-9672-68a26423fe86",
+            "document_id": "d59550ae-920a-4d43-ae7c-5a4864284212",
+            "filename": "harbour.md",
+            "chunk_index": 0,
+            "score": 0.93423295,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "harbour-system",
+      "question": "Which system has a seven-day backup retention period?",
+      "expected_documents": [
+        "harbour.md"
+      ],
+      "expected_terms": [
+        "Harbour"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "harbour.md"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "Harbour has a seven-day backup retention period. [Source 1]",
+        "sources": [
+          {
+            "page": null,
+            "section": "Harbour backups",
+            "text": "# Harbour backups\n\nHarbour backups are retained for seven days.",
+            "source_id": 1,
+            "chunk_id": "cc716220-39a8-56ee-9672-68a26423fe86",
+            "document_id": "d59550ae-920a-4d43-ae7c-5a4864284212",
+            "filename": "harbour.md",
+            "chunk_index": 0,
+            "score": 0.70732164,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "harbour-deletion",
+      "question": "Are Harbour backups kept for a month?",
+      "expected_documents": [
+        "harbour.md"
+      ],
+      "expected_terms": [
+        "seven days"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "harbour.md"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "No, Harbour backups are not kept for a month. They are retained for seven days [Source 1].",
+        "sources": [
+          {
+            "page": null,
+            "section": "Harbour backups",
+            "text": "# Harbour backups\n\nHarbour backups are retained for seven days.",
+            "source_id": 1,
+            "chunk_id": "cc716220-39a8-56ee-9672-68a26423fe86",
+            "document_id": "d59550ae-920a-4d43-ae7c-5a4864284212",
+            "filename": "harbour.md",
+            "chunk_index": 0,
+            "score": 0.93048894,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "atlas-time",
+      "question": "At what time does the Atlas support desk open?",
+      "expected_documents": [
+        "atlas.docx"
+      ],
+      "expected_terms": [
+        "09:30"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "atlas.docx"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "The Atlas support desk opens at 09:30 on weekdays. [Source 1]",
+        "sources": [
+          {
+            "page": null,
+            "section": "Atlas support",
+            "text": "Atlas support\n\nThe Atlas support desk opens at 09:30 on weekdays.",
+            "source_id": 1,
+            "chunk_id": "cc05b958-7d70-59d5-be31-6bfcf8c2ede1",
+            "document_id": "026a208b-8a8b-4a93-909b-48a678df43fe",
+            "filename": "atlas.docx",
+            "chunk_index": 0,
+            "score": 0.93031347,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "atlas-days",
+      "question": "On which days does Atlas support open?",
+      "expected_documents": [
+        "atlas.docx"
+      ],
+      "expected_terms": [
+        "weekdays"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "atlas.docx"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "Atlas support opens on weekdays, specifically starting at 09:30 [Source 1].",
+        "sources": [
+          {
+            "page": null,
+            "section": "Atlas support",
+            "text": "Atlas support\n\nThe Atlas support desk opens at 09:30 on weekdays.",
+            "source_id": 1,
+            "chunk_id": "cc05b958-7d70-59d5-be31-6bfcf8c2ede1",
+            "document_id": "026a208b-8a8b-4a93-909b-48a678df43fe",
+            "filename": "atlas.docx",
+            "chunk_index": 0,
+            "score": 0.8191242,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "atlas-name",
+      "question": "Which support desk opens at 09:30?",
+      "expected_documents": [
+        "atlas.docx"
+      ],
+      "expected_terms": [
+        "Atlas"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "atlas.docx"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "The Atlas support desk opens at 09:30 on weekdays. [Source 1]",
+        "sources": [
+          {
+            "page": null,
+            "section": "Atlas support",
+            "text": "Atlas support\n\nThe Atlas support desk opens at 09:30 on weekdays.",
+            "source_id": 1,
+            "chunk_id": "cc05b958-7d70-59d5-be31-6bfcf8c2ede1",
+            "document_id": "026a208b-8a8b-4a93-909b-48a678df43fe",
+            "filename": "atlas.docx",
+            "chunk_index": 0,
+            "score": 0.74527264,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "cedar-location",
+      "question": "Where is the Cedar emergency assembly point?",
+      "expected_documents": [
+        "cedar.pdf"
+      ],
+      "expected_terms": [
+        "north gate"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "cedar.pdf"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "The Cedar emergency assembly point is located at the north gate. [Source 1]",
+        "sources": [
+          {
+            "page": 1,
+            "section": null,
+            "text": "The Cedar emergency assembly point is the north gate.",
+            "source_id": 1,
+            "chunk_id": "337efcae-2cca-5f4e-bed1-f3a5caf90bf6",
+            "document_id": "42d37f0a-8ad5-487a-a32b-18934a7d7be5",
+            "filename": "cedar.pdf",
+            "chunk_index": 0,
+            "score": 0.84628034,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "cedar-gate",
+      "question": "Which gate should Cedar staff assemble at in an emergency?",
+      "expected_documents": [
+        "cedar.pdf"
+      ],
+      "expected_terms": [
+        "north"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "cedar.pdf"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "In an emergency, Cedar staff should assemble at the north gate, as stated in Source 1.",
+        "sources": [
+          {
+            "page": 1,
+            "section": null,
+            "text": "The Cedar emergency assembly point is the north gate.",
+            "source_id": 1,
+            "chunk_id": "337efcae-2cca-5f4e-bed1-f3a5caf90bf6",
+            "document_id": "42d37f0a-8ad5-487a-a32b-18934a7d7be5",
+            "filename": "cedar.pdf",
+            "chunk_index": 0,
+            "score": 0.8038919,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "plain Source 1 reference; requested bracket format missing",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "cedar-purpose",
+      "question": "What is the north gate used for at Cedar?",
+      "expected_documents": [
+        "cedar.pdf"
+      ],
+      "expected_terms": [
+        "assembly"
+      ],
+      "answerable": true,
+      "top_k": 1,
+      "retrieved_documents": [
+        "cedar.pdf"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "The north gate at Cedar is designated as the emergency assembly point. [Source 1]",
+        "sources": [
+          {
+            "page": 1,
+            "section": null,
+            "text": "The Cedar emergency assembly point is the north gate.",
+            "source_id": 1,
+            "chunk_id": "337efcae-2cca-5f4e-bed1-f3a5caf90bf6",
+            "document_id": "42d37f0a-8ad5-487a-a32b-18934a7d7be5",
+            "filename": "cedar.pdf",
+            "chunk_index": 0,
+            "score": 0.8226702,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "combined-release-backups",
+      "question": "State the Orion launch weekday and Harbour backup retention.",
+      "expected_documents": [
+        "orion.txt",
+        "harbour.md"
+      ],
+      "expected_terms": [
+        "Friday",
+        "seven days"
+      ],
+      "answerable": true,
+      "top_k": 2,
+      "retrieved_documents": [
+        "harbour.md",
+        "orion.txt"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "Project Orion launches on Friday [Source 2]. Harbour backups are retained for seven days [Source 1].",
+        "sources": [
+          {
+            "page": null,
+            "section": "Harbour backups",
+            "text": "# Harbour backups\n\nHarbour backups are retained for seven days.",
+            "source_id": 1,
+            "chunk_id": "cc716220-39a8-56ee-9672-68a26423fe86",
+            "document_id": "d59550ae-920a-4d43-ae7c-5a4864284212",
+            "filename": "harbour.md",
+            "chunk_index": 0,
+            "score": 0.6888345,
+            "embedding_model": "qwen3-embedding:4b"
+          },
+          {
+            "page": null,
+            "section": null,
+            "text": "Project Orion launches on Friday. The release manager is Alice.",
+            "source_id": 2,
+            "chunk_id": "5d256686-125a-5b3e-bd61-10e388811d70",
+            "document_id": "00d9e32d-b9d2-4fc5-8b95-1635607ec2e1",
+            "filename": "orion.txt",
+            "chunk_index": 0,
+            "score": 0.6143463,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "combined-support-emergency",
+      "question": "State the Atlas support opening time and Cedar assembly point.",
+      "expected_documents": [
+        "atlas.docx",
+        "cedar.pdf"
+      ],
+      "expected_terms": [
+        "09:30",
+        "north gate"
+      ],
+      "answerable": true,
+      "top_k": 2,
+      "retrieved_documents": [
+        "atlas.docx",
+        "cedar.pdf"
+      ],
+      "retrieval_pass": true,
+      "response": {
+        "answer": "Atlas support opens at 09:30 on weekdays [Source 1]. The Cedar emergency assembly point is the north gate [Source 2].",
+        "sources": [
+          {
+            "page": null,
+            "section": "Atlas support",
+            "text": "Atlas support\n\nThe Atlas support desk opens at 09:30 on weekdays.",
+            "source_id": 1,
+            "chunk_id": "cc05b958-7d70-59d5-be31-6bfcf8c2ede1",
+            "document_id": "026a208b-8a8b-4a93-909b-48a678df43fe",
+            "filename": "atlas.docx",
+            "chunk_index": 0,
+            "score": 0.6730018,
+            "embedding_model": "qwen3-embedding:4b"
+          },
+          {
+            "page": 1,
+            "section": null,
+            "text": "The Cedar emergency assembly point is the north gate.",
+            "source_id": 2,
+            "chunk_id": "337efcae-2cca-5f4e-bed1-f3a5caf90bf6",
+            "document_id": "42d37f0a-8ad5-487a-a32b-18934a7d7be5",
+            "filename": "cedar.pdf",
+            "chunk_index": 0,
+            "score": 0.5547197,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "pass",
+        "abstention": "not applicable"
+      }
+    },
+    {
+      "id": "unsupported-budget",
+      "question": "What is the budget for Project Orion?",
+      "expected_documents": [],
+      "expected_terms": [],
+      "answerable": false,
+      "top_k": 1,
+      "retrieved_documents": [
+        "orion.txt"
+      ],
+      "retrieval_pass": null,
+      "response": {
+        "answer": "The provided document does not contain information regarding the budget for Project Orion.",
+        "sources": [
+          {
+            "page": null,
+            "section": null,
+            "text": "Project Orion launches on Friday. The release manager is Alice.",
+            "source_id": 1,
+            "chunk_id": "5d256686-125a-5b3e-bd61-10e388811d70",
+            "document_id": "00d9e32d-b9d2-4fc5-8b95-1635607ec2e1",
+            "filename": "orion.txt",
+            "chunk_index": 0,
+            "score": 0.58818954,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "not required for abstention",
+        "abstention": "pass"
+      }
+    },
+    {
+      "id": "unsupported-weekend",
+      "question": "What time does the Atlas desk open on Sunday?",
+      "expected_documents": [],
+      "expected_terms": [],
+      "answerable": false,
+      "top_k": 1,
+      "retrieved_documents": [
+        "atlas.docx"
+      ],
+      "retrieval_pass": null,
+      "response": {
+        "answer": "The provided document does not contain information about the Atlas desk's operating hours on Sundays.",
+        "sources": [
+          {
+            "page": null,
+            "section": "Atlas support",
+            "text": "Atlas support\n\nThe Atlas support desk opens at 09:30 on weekdays.",
+            "source_id": 1,
+            "chunk_id": "cc05b958-7d70-59d5-be31-6bfcf8c2ede1",
+            "document_id": "026a208b-8a8b-4a93-909b-48a678df43fe",
+            "filename": "atlas.docx",
+            "chunk_index": 0,
+            "score": 0.81670415,
+            "embedding_model": "qwen3-embedding:4b"
+          }
+        ]
+      },
+      "human_review": {
+        "grounding": "pass",
+        "source_mapping": "pass",
+        "citation_format": "not required for abstention",
+        "abstention": "pass"
+      }
+    }
+  ],
+  "tested_on": "2026-11-10",
+  "embedding_model": "qwen3-embedding:4b",
+  "embedding_digest": "df5bd2e3c74cd8d069d21dc038f1b359fcdc9458fce1c99bd43c9eb1518ff907",
+  "chat_digest": "fd429f23b90980ed1bef53b990894e7b0199331f6ae90c5650240a7d5b70f1f7",
+  "review_note": "Synthetic four-document smoke corpus; this does not establish quality on representative user documents."
+}
