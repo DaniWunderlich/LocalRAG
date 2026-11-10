@@ -1,5 +1,6 @@
 /* Local composer behaviour. No user content, requests or remote scripts. */
 export default function () {
+  window.__localRagComposer?.();
   let main = null;
   let shell = null;
   let transcript = null;
@@ -66,10 +67,13 @@ export default function () {
   mutations.observe(document.body, { childList: true, subtree: true, characterData: true });
   window.addEventListener("resize", schedule, { passive: true });
   schedule();
-  return () => {
+  const dispose = () => {
     mutations.disconnect();
     window.removeEventListener("resize", schedule);
     if (frame) window.cancelAnimationFrame(frame);
     detach();
+    if (window.__localRagComposer === dispose) delete window.__localRagComposer;
   };
+  window.__localRagComposer = dispose;
+  return dispose;
 }

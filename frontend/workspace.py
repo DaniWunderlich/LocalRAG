@@ -76,6 +76,12 @@ def conversation_rail(
         backend_notice()
 
 
+def close_chat_settings() -> None:
+    """Forget the open dialog when it is saved or dismissed."""
+    st.session_state.pop("chat_settings_id", None)
+
+
+@st.dialog("Chat model and settings", icon=":material/tune:", on_dismiss=close_chat_settings)
 def chat_options(
     client: BackendClient,
     conversation: dict[str, Any] | None,
@@ -84,80 +90,72 @@ def chat_options(
     """Keep model selection and infrequent edits together beside the composer."""
     conversation_id = conversation["conversation_id"] if conversation else "new"
     selected = conversation["model"] if conversation else st.session_state.get("selected_model")
-    with st.popover(
-        "Chat model and settings",
-        icon=":material/tune:",
-        help="Chat model and settings",
-        key="composer-settings",
-        width=40,
-    ):
-        st.markdown("**Chat model and settings**")
-        if names:
-            model = st.selectbox(
-                "Chat model",
-                names,
-                index=names.index(selected) if selected in names else None,
-                placeholder="Choose a local model",
-                key=f"model-{conversation_id}",
-            )
-            if model and model != selected:
-                if conversation:
-                    client.update_conversation(conversation_id, model=model)
-                else:
-                    st.session_state.selected_model = model
-                st.rerun()
-        else:
-            st.warning("No local chat models are available.")
-        with st.form(f"options-{conversation_id}"):
-            title = (
-                st.text_input("Chat name", value=conversation["title"], max_chars=120)
+    if names:
+        model = st.selectbox(
+            "Chat model",
+            names,
+            index=names.index(selected) if selected in names else None,
+            placeholder="Choose a local model",
+            key=f"model-{conversation_id}",
+        )
+        if model and model != selected:
+            if conversation:
+                client.update_conversation(conversation_id, model=model)
+            else:
+                st.session_state.selected_model = model
+            st.rerun()
+    else:
+        st.warning("No local chat models are available.")
+    with st.form(f"options-{conversation_id}"):
+        title = (
+            st.text_input("Chat name", value=conversation["title"], max_chars=120)
+            if conversation
+            else None
+        )
+        top_k = st.number_input(
+            "Maximum source excerpts",
+            min_value=1,
+            max_value=20,
+            value=int(conversation["top_k"] if conversation else st.session_state.get("top_k", 5)),
+        )
+        temperature = st.slider(
+            "Temperature",
+            min_value=0.0,
+            max_value=1.0,
+            value=float(
+                conversation["temperature"]
                 if conversation
-                else None
-            )
-            top_k = st.number_input(
-                "Maximum source excerpts",
-                min_value=1,
-                max_value=20,
-                value=int(
-                    conversation["top_k"] if conversation else st.session_state.get("top_k", 5)
-                ),
-            )
-            temperature = st.slider(
-                "Temperature",
-                min_value=0.0,
-                max_value=1.0,
-                value=float(
-                    conversation["temperature"]
-                    if conversation
-                    else st.session_state.get("temperature", 0.2)
-                ),
-                step=0.05,
-            )
-            if st.form_submit_button("Save changes"):
-                if conversation:
-                    client.update_conversation(
-                        conversation_id,
-                        title=title,
-                        top_k=top_k,
-                        temperature=temperature,
-                    )
-                else:
-                    st.session_state.top_k = top_k
-                    st.session_state.temperature = temperature
-                st.rerun()
-        if conversation:
-            st.divider()
-            st.caption("Deleting a chat also removes private files that no other chat uses.")
-            confirmed = st.checkbox(
-                "Delete this chat and its private files",
-                key=f"confirm-chat-{conversation_id}",
-            )
-            if st.button("Delete chat", disabled=not confirmed, key="delete-chat"):
-                client.delete_conversation(conversation_id)
-                st.session_state.get("pending_submissions", {}).pop(conversation_id, None)
-                st.session_state.active_chat_id = None
-                st.query_params.pop("chat", None)
-                st.rerun()
+                else st.session_state.get("temperature", 0.2)
+            ),
+            step=0.05,
+        )
+        if st.form_submit_button("Save changes"):
+            if conversation:
+                client.update_conversation(
+                    conversation_id,
+                    title=title,
+                    top_k=top_k,
+                    temperature=temperature,
+                )
+            else:
+                st.session_state.top_k = top_k
+                st.session_state.temperature = temperature
+            close_chat_settings()
+            st.rerun()
+    if conversation:
+        st.divider()
+        st.caption("Deleting a chat also removes private files that no other chat uses.")
+        confirmed = st.checkbox(
+            "Delete this chat and its private files",
+            key=f"confirm-chat-{conversation_id}",
+        )
+        if st.button("Delete chat", disabled=not confirmed, key="delete-chat"):
+            client.delete_conversation(conversation_id)
+            st.session_state.get("pending_submissions", {}).pop(conversation_id, None)
+            st.session_state.active_chat_id = None
+            st.query_params.pop("chat", None)
+            close_chat_settings()
+            st.rerun()
 
 
 def library_options(client: BackendClient, conversation: dict[str, Any] | None) -> None:
@@ -168,28 +166,24 @@ def library_options(client: BackendClient, conversation: dict[str, Any] | None) 
         if conversation
         else st.session_state.get("new_chat_use_library", False)
     )
-    with st.popover(
-        "Library sources",
-        icon=":material/library_books:",
+    label = "Exclude shared library" if included else "Include shared library"
+    if st.button(
+        label,
+        icon=":material/library_add_check:" if included else ":material/library_books:",
         key="composer-library",
-        help="Shared library included" if included else "Shared library excluded",
-        type="primary" if included else "secondary",
+        help=(
+            "Shared library included. Click to exclude it."
+            if included
+            else "Shared library excluded. Click to include it."
+        ),
+        type="primary" if included else "tertiary",
         width=40,
     ):
-        st.markdown("**Document library**")
-        use_library = st.toggle(
-            "Include library",
-            value=included,
-            key=f"library-{conversation_id}",
-            help="Also search documents deliberately added to the shared library.",
-        )
-        st.caption("Documents attached to this chat are always included.")
-        if use_library != included:
-            if conversation:
-                client.update_conversation(conversation_id, use_library=use_library)
-            else:
-                st.session_state.new_chat_use_library = use_library
-            st.rerun()
+        if conversation:
+            client.update_conversation(conversation_id, use_library=not included)
+        else:
+            st.session_state.new_chat_use_library = not included
+        st.rerun()
 
 
 def composer(
@@ -205,6 +199,7 @@ def composer(
             "Ask about your documents, or attach files",
             key=f"composer-{conversation_id}",
             max_chars=8000,
+            height=112,
             accept_file="multiple",
             file_type=["pdf", "docx", "txt", "md", "markdown"],
             max_upload_size=20,
@@ -216,13 +211,22 @@ def composer(
             gap="small",
             key="composer-tools",
         ):
-            chat_options(client, conversation, names)
-            library_options(client, conversation)
             model = (
                 conversation["model"] if conversation else st.session_state.get("selected_model")
             )
-            st.caption(model or "Choose a local model")
+            if st.button(
+                "Chat model and settings",
+                icon=":material/tune:",
+                help=f"Chat settings ({model})" if model else "Choose a local chat model",
+                key="composer-settings",
+                type="tertiary",
+                width=40,
+            ):
+                st.session_state.chat_settings_id = conversation_id
+            library_options(client, conversation)
         install_composer_behaviour()
+    if st.session_state.get("chat_settings_id") == conversation_id:
+        chat_options(client, conversation, names)
     return prompt
 
 
