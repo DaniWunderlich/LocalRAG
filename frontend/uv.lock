@@ -658,7 +658,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
-    { name = "streamlit", specifier = ">=1.54" },
+    { name = "streamlit", specifier = ">=1.67" },
 ]
 
 [package.metadata.requires-dev]

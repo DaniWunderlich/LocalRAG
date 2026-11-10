@@ -3,7 +3,7 @@ name = "rag-frontend"
 version = "0.1.0"
 description = "Streamlit interface for local document questions and source inspection."
 requires-python = ">=3.14,<3.15"
-dependencies = ["streamlit>=1.54", "httpx>=0.28"]
+dependencies = ["streamlit>=1.67", "httpx>=0.28"]
 
 [dependency-groups]
 dev = ["ruff>=0.15", "mypy>=1.19", "pytest>=9"]
