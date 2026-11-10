@@ -1,4 +1,4 @@
-"""Streamlit interaction tests for persistent conversations and inline documents."""
+"""Gradio workspace tests for persistent conversations and inline documents."""
 
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
@@ -8,15 +8,17 @@ from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
 
-from streamlit.testing.v1 import AppTest
+import pytest
+from fastapi.testclient import TestClient
 
 from api_client import BackendClient, BackendError
+from workspace import Draft, Session, Workspace, source_details, transcript
 
 ROOT = Path(__file__).parents[1]
 
 
 class BackendDouble:
-    """An inspectable transport double; no Streamlit page performs RAG work."""
+    """An inspectable transport double; no frontend callback performs RAG work."""
 
     def __init__(self) -> None:
         self.chats: dict[str, dict[str, Any]] = {}
@@ -132,208 +134,252 @@ def fake_backend() -> Iterator[BackendDouble]:
         yield backend
 
 
-def test_pages_render_without_emojis_or_dashboard_cards() -> None:
-    with fake_backend():
-        for path in ["app.py", "pages/1_Documents.py", "pages/2_Settings.py"]:
-            app = AppTest.from_file(str(ROOT / path)).run()
-            assert not app.exception
-        assert app.session_state["top_k"] == 7
+def make_workspace(tmp_path: Path) -> tuple[Workspace, Session]:
+    """Use a bounded temporary upload root and initialise the patched HTTP boundary."""
+    controller = Workspace(upload_root=tmp_path)
+    session = Session()
+    controller.initialise(session)
+    return controller, session
 
 
-def test_text_and_file_are_submitted_from_the_same_composer() -> None:
+def test_native_app_serves_health_and_gradio_components() -> None:
+    from app import app
+
+    with TestClient(app) as client:
+        assert client.get("/health/live").json() == {"status": "alive"}
+        config = client.get("/config").json()
+        kinds = {item["type"] for item in config["components"]}
+        assert {"chatbot", "multimodaltextbox", "sidebar", "state", "dataframe"} <= kinds
+        assert config["analytics_enabled"] is False
+        assert config["enable_queue"] is True
+
+
+def test_text_and_file_share_a_single_durable_conversation(tmp_path: Path) -> None:
     with fake_backend() as backend:
-        app = AppTest.from_file(str(ROOT / "app.py")).run()
-        app.chat_input[0].upload("release.txt", b"Friday release", "text/plain")
-        app.chat_input[0].set_value("When is the release?").run()
-        assert not app.exception
-        assert len(backend.uploads) == 1
-        assert len(backend.submissions) == 1
-        assert backend.uploads[0][0] == backend.submissions[0][0]
-        assert backend.uploads[0][2] == b"Friday release"
-        assert any(item.label.startswith("Sources") for item in app.expander)
-
-
-def test_files_alone_create_a_chat_without_generating_an_answer() -> None:
-    with fake_backend() as backend:
-        app = AppTest.from_file(str(ROOT / "app.py")).run()
-        app.chat_input[0].upload("release.txt", b"Friday", "text/plain").run()
-        assert not app.exception
+        controller, session = make_workspace(tmp_path)
+        file = tmp_path / "release.txt"
+        file.write_text("Friday release")
+        controller.submit(session, {"text": "When is the release?", "files": [str(file)]})
         assert len(backend.chats) == 1
-        assert len(backend.uploads) == 1
+        assert len(backend.uploads) == len(backend.submissions) == 1
+        assert backend.uploads[0][0] == backend.submissions[0][0] == session.active_id
+        assert session.pending == {}
+        assert session.drafts == {}
+        assert "Sources (1)" in transcript(session)[-1]["content"]
+
+
+def test_files_alone_do_not_generate_an_answer(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        controller, session = make_workspace(tmp_path)
+        file = tmp_path / "release.md"
+        file.write_text("Friday")
+        controller.submit(session, {"text": "", "files": [str(file)]})
+        assert len(backend.chats) == len(backend.uploads) == 1
         assert backend.submissions == []
 
 
-def test_existing_threads_can_be_selected_without_mixing_messages() -> None:
-    with fake_backend() as backend:
-        first = backend.create("chat:test", 5, 0.2)["conversation_id"]
-        second = backend.create("chat:test", 3, 0.0)["conversation_id"]
-        backend.update(first, title="Release planning")
-        backend.update(second, title="Backup retention")
-        app = AppTest.from_file(str(ROOT / "app.py")).run()
-        app.button(key=f"open-{first}").click().run()
-        assert app.title[0].value == "Release planning"
-        app.chat_input[0].set_value("When is the release?").run()
-        app.button(key=f"open-{second}").click().run()
-        assert app.title[0].value == "Backup retention"
-        assert backend.chats[second]["messages"] == []
-        assert app.session_state["active_chat_id"] == second
-        assert not app.exception
-
-
-def test_library_toggle_is_saved_only_on_the_selected_chat() -> None:
+def test_chat_switching_retains_distinct_unsent_drafts(tmp_path: Path) -> None:
     with fake_backend() as backend:
         first = backend.create("chat:test", 5, 0.2)["conversation_id"]
         second = backend.create("chat:test", 5, 0.2)["conversation_id"]
-        app = AppTest.from_file(str(ROOT / "app.py"))
-        app.query_params["chat"] = first
-        app.run()
-        app.button(key="composer-library").click().run()
+        controller, session = make_workspace(tmp_path)
+        controller.select(session, first, None)
+        controller.select(session, second, {"text": "First unsent question", "files": []})
+        controller.select(session, first, {"text": "Second unsent question", "files": []})
+        assert session.drafts[first].text == "First unsent question"
+        assert session.drafts[second].text == "Second unsent question"
+        assert session.conversation is not None and session.conversation["messages"] == []
+
+
+def test_library_icon_updates_only_the_selected_chat(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        first = backend.create("chat:test", 5, 0.2)["conversation_id"]
+        second = backend.create("chat:test", 5, 0.2)["conversation_id"]
+        controller, session = make_workspace(tmp_path)
+        controller.select(session, first, None)
+        controller.toggle_library(session)
+        assert session.use_library is True
         assert backend.chats[first]["use_library"] is True
         assert backend.chats[second]["use_library"] is False
-        assert app.button(key="composer-library").label == "Exclude shared library"
-        app.button(key="composer-library").click().run()
-        assert backend.chats[first]["use_library"] is False
-        assert not app.exception
+        controller.toggle_library(session)
+        assert session.use_library is False
 
 
-def test_failed_submission_keeps_the_same_request_id_for_retry() -> None:
+def test_unsaved_library_choice_applies_to_the_created_chat(tmp_path: Path) -> None:
     with fake_backend() as backend:
-        backend.fail_send = True
-        app = AppTest.from_file(str(ROOT / "app.py")).run()
-        app.chat_input[0].set_value("When is the release?").run()
-        assert not app.exception
-        assert app.error[0].value == "Ollama is temporarily unavailable."
-        first_request_id = backend.submissions[0][2]
-        backend.fail_send = False
-        next(button for button in app.button if button.label == "Retry submission").click().run()
-        assert not app.exception
-        assert backend.submissions[-1][2] == first_request_id
-        assert len(next(iter(backend.chats.values()))["messages"]) == 2
-
-
-def test_backend_outage_displays_a_recovery_action() -> None:
-    with (
-        fake_backend(),
-        patch.object(
-            BackendClient,
-            "conversations",
-            side_effect=BackendError("Backend unavailable."),
-        ),
-    ):
-        app = AppTest.from_file(str(ROOT / "app.py")).run()
-        assert not app.exception
-        assert app.error[0].value == "Backend unavailable."
-        assert any(button.label == "Try again" for button in app.button)
-
-
-def test_legacy_session_is_imported_before_chat_navigation() -> None:
-    with fake_backend() as backend:
-        legacy = [
-            {"role": "user", "content": "An earlier question"},
-            {"role": "assistant", "content": "An earlier answer", "sources": []},
-        ]
-
-        def import_saved(
-            conversation_id: str,
-            messages: list[dict[str, Any]],
-            model: str,
-            top_k: int,
-            temperature: float,
-        ) -> dict[str, Any]:
-            created = backend.create(model, top_k, temperature)
-            backend.chats[created["conversation_id"]]["messages"] = [
-                {**message, "message_id": str(uuid4())} for message in messages
-            ]
-            return deepcopy(backend.chats[created["conversation_id"]])
-
-        with patch.object(
-            BackendClient, "import_conversation", side_effect=import_saved
-        ) as imported:
-            app = AppTest.from_file(str(ROOT / "app.py"))
-            app.session_state.messages = legacy
-            app.run()
-            assert not app.exception
-            assert imported.call_count == 1
-            assert len(next(iter(backend.chats.values()))["messages"]) == 2
-            app.run()
-            assert imported.call_count == 1
-
-
-def test_failed_drafts_remain_with_their_original_chat() -> None:
-    with fake_backend() as backend:
-        first = backend.create("chat:test", 5, 0.2)["conversation_id"]
-        second = backend.create("chat:test", 5, 0.2)["conversation_id"]
-        backend.update(first, title="First chat")
-        backend.update(second, title="Second chat")
-        app = AppTest.from_file(str(ROOT / "app.py"))
-        app.query_params["chat"] = first
-        app.run()
-        backend.fail_send = True
-        app.chat_input[0].set_value("The first question").run()
-        app.button(key=f"open-{second}").click().run()
-        backend.fail_send = False
-        app.chat_input[0].set_value("The second question").run()
-        app.button(key=f"open-{first}").click().run()
-        assert not app.exception
-        assert app.error[0].value == "Ollama is temporarily unavailable."
-        assert app.session_state["pending_submissions"][first]["text"] == "The first question"
-        assert second not in app.session_state["pending_submissions"]
-
-
-def test_model_and_library_controls_are_outside_the_scrolling_transcript() -> None:
-    with fake_backend() as backend:
-        chat_id = backend.create("chat:test", 5, 0.2)["conversation_id"]
-        app = AppTest.from_file(str(ROOT / "app.py"))
-        app.query_params["chat"] = chat_id
-        app.run()
-        assert not app.exception
-        assert len(app.main.selectbox) == 0
-        assert len(app.main.toggle) == 0
-        assert len(app.selectbox) == 0
-        assert len(app.toggle) == 0
-        assert len(app.get("popover")) == 0
-        assert app.button(key="composer-settings").icon == ":material/tune:"
-        assert app.button(key="composer-library").label == "Include shared library"
-        assert len(app.chat_input) == 1
-
-
-def test_composer_model_selection_and_chat_options_update_the_same_thread() -> None:
-    with fake_backend() as backend:
-        chat_id = backend.create("chat:test", 5, 0.2)["conversation_id"]
-        other = backend.create("chat:test", 5, 0.2)["conversation_id"]
-        with patch.object(
-            BackendClient,
-            "models",
-            return_value={
-                "models": ["chat:test", "chat:alternative"],
-                "default_model": "chat:test",
-                "defaults": {"top_k": 5, "temperature": 0.2, "max_upload_bytes": 20971520},
-            },
-        ):
-            app = AppTest.from_file(str(ROOT / "app.py"))
-            app.query_params["chat"] = chat_id
-            app.run()
-            app.button(key="composer-settings").click().run()
-            app.selectbox[0].set_value("chat:alternative").run()
-            assert backend.chats[chat_id]["model"] == "chat:alternative"
-            app.number_input[0].set_value(3)
-            next(button for button in app.button if button.label == "Save changes").click().run()
-            assert backend.chats[chat_id]["top_k"] == 3
-            assert backend.chats[other]["model"] == "chat:test"
-            assert backend.chats[other]["top_k"] == 5
-            assert len(app.selectbox) == 0
-            app.button(key="composer-library").click().run()
-            assert len(app.selectbox) == 0
-            assert backend.chats[chat_id]["use_library"] is True
-            assert not app.exception
-
-
-def test_library_choice_in_an_empty_composer_applies_to_the_created_chat() -> None:
-    with fake_backend() as backend:
-        app = AppTest.from_file(str(ROOT / "app.py")).run()
-        app.button(key="composer-library").click().run()
-        assert backend.chats == {}
-        app.chat_input[0].set_value("Use the shared library").run()
-        assert not app.exception
+        controller, session = make_workspace(tmp_path)
+        controller.toggle_library(session)
+        controller.submit(session, {"text": "Use the library", "files": []})
         assert next(iter(backend.chats.values()))["use_library"] is True
-        assert app.session_state["new_chat_use_library"] is False
+        assert session.new_use_library is False
+
+
+def test_retry_keeps_request_id_and_skips_successful_uploads(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        controller, session = make_workspace(tmp_path)
+        file = tmp_path / "release.txt"
+        file.write_text("Friday")
+        backend.fail_send = True
+        with pytest.raises(BackendError):
+            controller.submit(session, {"text": "When?", "files": [str(file)]})
+        assert len(backend.uploads) == 1
+        key = session.key
+        request_id = session.pending[key].request_id
+        assert session.pending[key].draft.files == []
+        backend.fail_send = False
+        controller.retry(session)
+        assert backend.submissions[-1][2] == request_id
+        assert len(backend.uploads) == 1
+        assert len(backend.chats[key]["messages"]) == 2
+
+
+def test_failed_submissions_stay_with_the_original_chat(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        controller, session = make_workspace(tmp_path)
+        backend.fail_send = True
+        with pytest.raises(BackendError):
+            controller.submit(session, {"text": "First question", "files": []})
+        first = session.key
+        controller.new(session, None)
+        backend.fail_send = False
+        controller.submit(session, {"text": "Second question", "files": []})
+        assert first in session.pending
+        assert session.key not in session.pending
+        controller.discard(session)
+        assert first in session.pending
+        controller.select(session, first, None)
+        assert session.pending[first].draft.text == "First question"
+
+
+def test_settings_are_saved_on_the_chat_without_changing_defaults(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        controller, session = make_workspace(tmp_path)
+        controller.new(session, None)
+        controller.save_settings(session, "Release plan", "chat:alternative", 3, 0.1)
+        assert backend.chats[session.key]["title"] == "Release plan"
+        assert backend.chats[session.key]["model"] == "chat:alternative"
+        assert backend.chats[session.key]["top_k"] == 3
+        assert session.model == "chat:test"
+        assert session.top_k == 7
+
+
+def test_invalid_uploads_do_not_create_chats(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        controller, session = make_workspace(tmp_path)
+        file = tmp_path / "unsafe.exe"
+        file.write_text("test")
+        with pytest.raises(BackendError, match="Use PDF"):
+            controller.submit(session, {"files": [str(file)]})
+        with pytest.raises(BackendError, match="temporary upload"):
+            controller.submit(session, {"files": [str(tmp_path / "missing.txt")]})
+        assert backend.chats == {}
+
+
+def test_file_paths_outside_the_upload_root_are_rejected(tmp_path: Path) -> None:
+    with fake_backend():
+        controller, session = make_workspace(tmp_path / "uploads")
+        file = tmp_path / "private.txt"
+        file.write_text("Private server file")
+        with pytest.raises(BackendError, match="temporary upload"):
+            controller.validate(session, Draft(files=[str(file)]))
+
+
+def test_oversized_upload_and_question_are_rejected_before_indexing(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        controller, session = make_workspace(tmp_path)
+        session.max_upload_bytes = 3
+        file = tmp_path / "large.txt"
+        file.write_text("Friday")
+        with pytest.raises(BackendError, match="upload limit"):
+            controller.submit(session, {"files": [str(file)]})
+        with pytest.raises(BackendError, match="8,000"):
+            controller.submit(session, {"text": "x" * 8001})
+        assert backend.uploads == []
+        assert backend.chats == {}
+
+
+def test_saved_chat_restores_when_models_are_unavailable(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        key = backend.create("chat:test", 5, 0.2)["conversation_id"]
+        with patch.object(BackendClient, "models", side_effect=BackendError("Ollama unavailable.")):
+            controller = Workspace(upload_root=tmp_path)
+            session = Session()
+            controller.initialise(session, key)
+        assert session.active_id == key
+        assert session.conversation == backend.chats[key]
+        assert session.service_notice == "Ollama unavailable."
+
+
+def test_source_snapshots_are_escaped_and_can_hide_excerpt_text() -> None:
+    sources = [
+        {
+            "source_id": 1,
+            "filename": "<script>bad</script>.txt",
+            "page": 2,
+            "section": None,
+            "chunk_index": 0,
+            "score": 0.9,
+            "text": "<img src=x onerror=alert(1)>",
+        }
+    ]
+    result = source_details(sources, True)
+    assert "<script>" not in result
+    assert "<img" not in result
+    assert "&lt;script&gt;" in result
+    assert "similarity 0.900" in result
+    assert "<pre>" not in source_details(sources, False)
+    assert "Sources (1)" in source_details(sources, False)
+
+
+def test_destructive_actions_require_confirmation(tmp_path: Path) -> None:
+    with fake_backend():
+        controller, session = make_workspace(tmp_path)
+        controller.new(session, None)
+        with patch.object(BackendClient, "delete_conversation") as deleted:
+            with pytest.raises(BackendError, match="Confirm"):
+                controller.delete_chat(session, False)
+            deleted.assert_not_called()
+        with patch.object(BackendClient, "delete") as removed:
+            with pytest.raises(BackendError, match="Select"):
+                controller.delete_document(session, False)
+            removed.assert_not_called()
+
+
+def test_browser_sessions_do_not_share_transient_state(tmp_path: Path) -> None:
+    with fake_backend():
+        controller, first = make_workspace(tmp_path)
+        second = Session()
+        controller.initialise(second)
+        controller.toggle_library(first)
+        first.remember({"text": "Private draft"})
+        assert second.use_library is False
+        assert second.drafts == {}
+
+
+def test_undeclared_chat_ids_are_rejected(tmp_path: Path) -> None:
+    with fake_backend():
+        controller, session = make_workspace(tmp_path)
+        with pytest.raises(BackendError, match="no longer available"):
+            controller.select(session, "../documents", None)
+        assert session.active_id is None
+
+
+def test_addressed_chat_is_restored_after_a_backend_outage(tmp_path: Path) -> None:
+    with fake_backend() as backend:
+        key = backend.create("chat:test", 5, 0.2)["conversation_id"]
+        controller = Workspace(upload_root=tmp_path)
+        session = Session()
+        with (
+            patch.object(
+                BackendClient, "conversations", side_effect=BackendError("Backend unavailable.")
+            ),
+            pytest.raises(BackendError),
+        ):
+            controller.initialise(session, key)
+        assert not session.initialised
+        assert session.requested_chat == key
+        controller.initialise(session)
+        assert session.active_id == key
+        session.remember({"text": "Still unsent"})
+        controller.initialise(session)
+        assert session.drafts[key].text == "Still unsent"
