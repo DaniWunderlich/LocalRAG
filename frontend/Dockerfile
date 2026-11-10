@@ -10,9 +10,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev \
     && useradd --system --uid 10001 --create-home app
-COPY app.py api_client.py ui.py ./
-COPY pages/ ./pages/
-COPY .streamlit/ ./.streamlit/
+COPY . .
 USER app
 EXPOSE 8501
 CMD ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.headless", "true"]
