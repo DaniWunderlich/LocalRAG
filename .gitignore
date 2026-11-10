@@ -1,4 +1,5 @@
 # ── Project documents (summarised in README) ──────────────────────────────────
+docs/DESIGN.md
 
 # ── Python ─────────────────────────────────────────────────────────────────────
 __pycache__/
