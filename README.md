@@ -28,12 +28,19 @@ Deleting a chat removes its unshared private originals and vectors, and keeps
 documents still used by another chat or the shared library.
 
 The pinned composer keeps chat controls within reach throughout a long
-conversation. Open the settings icon below the text field to choose a local
-chat model, rename the chat or adjust generation settings. The library icon
-opens **Include library** and is highlighted while shared documents are included.
-A round down-arrow appears above the composer when later messages are out of
-view; select it to return to the latest message. Reduced-motion preferences
-are respected. Clicking the text field keeps its neutral border.
+conversation. Two icon buttons sit immediately to the left of the file-upload
+plus: settings opens a dialog for model choice, chat naming and generation
+settings; the library icon directly includes or excludes shared documents.
+The enabled library icon is highlighted and carries a check mark. Its label and
+tooltip also explain the current action. A round down-arrow appears above the
+composer when later messages are out of view; select it to return to the latest
+message. Reduced-motion preferences are respected. Clicking the text field
+keeps its neutral border.
+
+Use the app menu at the top right to choose **Light**, **Dark** or **System**.
+The browser remembers this preference across pages and reloads. Both appearances
+use the reading-desk palette throughout the chat, library, forms and dialogs.
+This preference is separate from saved chat settings.
 
 A transcript from the original session-only interface is imported into a saved
 chat when that browser session first runs the new interface. Successful message
@@ -364,8 +371,10 @@ turns using local Ollama, persistence of all 14 test chats, evidence isolation
 and preservation of shared-library originals during chat deletion.
 
 The composer controls were additionally reviewed on desktop and at 390 px using
-an isolated 24-message chat. The review covered focus styling, upward-opening
-menus, library opt-in without losing a draft, and returning to the latest
-message after scrolling upwards. The local scroll controller uses Streamlit's
-component lifecycle and contains no user-provided code or remote scripts.
+an isolated 24-message chat. The review covered focus styling, the settings
+dialog, direct library opt-in without losing a draft, appearance changes in
+both directions, and returning to the latest message after scrolling upwards.
+The local controllers use Streamlit's component lifecycle and contain no
+user-provided code or remote scripts. Shared surface colours track the native
+component theme variables directly, without waiting for a Python rerun.
 Streamlit 1.67 or later is required for the pinned bottom container.
