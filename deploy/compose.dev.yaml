@@ -9,4 +9,4 @@ services:
   frontend:
     volumes:
       - ../frontend:/app:ro
-    command: ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.headless", "true", "--server.runOnSave", "true"]
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860", "--reload", "--reload-dir", "/app", "--reload-include", "*.css", "--reload-include", "*.js"]

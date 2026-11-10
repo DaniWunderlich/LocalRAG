@@ -5,12 +5,14 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    GRADIO_ANALYTICS_ENABLED=False \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    GRADIO_TEMP_DIR=/tmp/localrag-uploads
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev \
     && useradd --system --uid 10001 --create-home app
 COPY . .
 USER app
-EXPOSE 8501
-CMD ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.headless", "true"]
+EXPOSE 7860
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]

@@ -4,16 +4,17 @@ services:
     build:
       context: ../frontend
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-8501}:8501"
+      - "127.0.0.1:${FRONTEND_PORT:-8501}:7860"
     environment:
       BACKEND_URL: http://backend:8000
       BACKEND_TIMEOUT_SECONDS: "${BACKEND_TIMEOUT_SECONDS:-600}"
-      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      GRADIO_ANALYTICS_ENABLED: "False"
+      HF_HUB_DISABLE_TELEMETRY: "1"
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=4)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/health/live', timeout=4)"]
       interval: 15s
       timeout: 5s
       retries: 5
