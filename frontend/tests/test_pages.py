@@ -187,9 +187,13 @@ def test_library_toggle_is_saved_only_on_the_selected_chat() -> None:
         app = AppTest.from_file(str(ROOT / "app.py"))
         app.query_params["chat"] = first
         app.run()
-        app.toggle[0].set_value(True).run()
+        app.button(key="composer-library").click().run()
         assert backend.chats[first]["use_library"] is True
         assert backend.chats[second]["use_library"] is False
+        assert app.button(key="composer-library").label == "Exclude shared library"
+        app.button(key="composer-library").click().run()
+        assert backend.chats[first]["use_library"] is False
+        assert not app.exception
 
 
 def test_failed_submission_keeps_the_same_request_id_for_retry() -> None:
@@ -285,8 +289,11 @@ def test_model_and_library_controls_are_outside_the_scrolling_transcript() -> No
         assert not app.exception
         assert len(app.main.selectbox) == 0
         assert len(app.main.toggle) == 0
-        assert len(app.selectbox) == 1
-        assert len(app.toggle) == 1
+        assert len(app.selectbox) == 0
+        assert len(app.toggle) == 0
+        assert len(app.get("popover")) == 0
+        assert app.button(key="composer-settings").icon == ":material/tune:"
+        assert app.button(key="composer-library").label == "Include shared library"
         assert len(app.chat_input) == 1
 
 
@@ -306,6 +313,7 @@ def test_composer_model_selection_and_chat_options_update_the_same_thread() -> N
             app = AppTest.from_file(str(ROOT / "app.py"))
             app.query_params["chat"] = chat_id
             app.run()
+            app.button(key="composer-settings").click().run()
             app.selectbox[0].set_value("chat:alternative").run()
             assert backend.chats[chat_id]["model"] == "chat:alternative"
             app.number_input[0].set_value(3)
@@ -313,13 +321,17 @@ def test_composer_model_selection_and_chat_options_update_the_same_thread() -> N
             assert backend.chats[chat_id]["top_k"] == 3
             assert backend.chats[other]["model"] == "chat:test"
             assert backend.chats[other]["top_k"] == 5
+            assert len(app.selectbox) == 0
+            app.button(key="composer-library").click().run()
+            assert len(app.selectbox) == 0
+            assert backend.chats[chat_id]["use_library"] is True
             assert not app.exception
 
 
 def test_library_choice_in_an_empty_composer_applies_to_the_created_chat() -> None:
     with fake_backend() as backend:
         app = AppTest.from_file(str(ROOT / "app.py")).run()
-        app.toggle[0].set_value(True).run()
+        app.button(key="composer-library").click().run()
         assert backend.chats == {}
         app.chat_input[0].set_value("Use the shared library").run()
         assert not app.exception
