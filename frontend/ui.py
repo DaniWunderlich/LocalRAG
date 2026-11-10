@@ -190,6 +190,14 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                             elem_id="composer-library",
                             elem_classes="icon-button",
                         )
+                    # Register both states on the live component before callback updates.
+                    library_icons = {
+                        False: library.icon,
+                        True: library.serve_static_file(ASSETS / "library-check.svg"),
+                    }
+                    for icon in library_icons.values():
+                        if icon:
+                            library.keep_in_cache.add(icon["path"])
                     gr.HTML(
                         '<button id="jump-to-latest" type="button" aria-label="Jump to latest message" title="Jump to latest message" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14m-6-6 6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>',
                         elem_id="jump-control",
@@ -278,11 +286,11 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                 ),
                 title: "# " + escape(conversation.get("title", "New chat")),
                 chat: transcript(session),
-                library: gr.Button(
+                library: gr.update(
                     value="Exclude shared library"
                     if session.use_library
                     else "Include shared library",
-                    icon=ASSETS / ("library-check.svg" if session.use_library else "library.svg"),
+                    icon=library_icons[session.use_library],
                     variant="primary" if session.use_library else "secondary",
                 ),
                 error: gr.Textbox(value=session.error, visible=bool(session.error)),

@@ -8,6 +8,9 @@
   let sidebarLayout = null;
   let dialog = null;
   let previousFocus = null;
+  let inertBackground = [];
+  let observedComposer = null;
+  const composerResize = new ResizeObserver(() => schedule());
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   let mode = "system";
   try { mode = localStorage.getItem("localrag-appearance") || "system"; } catch { /* Storage may be unavailable. */ }
@@ -31,8 +34,41 @@
     const nodes = [chat, ...chat.querySelectorAll("div")];
     return nodes.find(node => /auto|scroll/.test(getComputedStyle(node).overflowY) && node.scrollHeight > node.clientHeight + 4) || chat;
   }
+  function restoreBackground() {
+    inertBackground.forEach(element => { element.inert = false; });
+    inertBackground = [];
+  }
+  function isolateDialog(panel) {
+    restoreBackground();
+    // Preserve the active branch; make every surrounding control truly modal.
+    for (let branch = panel; branch.parentElement && branch !== document.body; branch = branch.parentElement) {
+      for (const sibling of branch.parentElement.children) {
+        if (sibling !== branch && sibling instanceof HTMLElement && !sibling.inert) {
+          sibling.inert = true;
+          inertBackground.push(sibling);
+        }
+      }
+    }
+  }
+  function alignComposer() {
+    const shell = document.getElementById("composer-shell");
+    const tools = document.getElementById("composer-actions");
+    const submit = shell?.querySelector('#composer [data-testid="submit-button"]');
+    if (shell !== observedComposer) {
+      composerResize.disconnect();
+      observedComposer = shell;
+      if (shell) composerResize.observe(shell);
+    }
+    if (!shell || !tools || !submit || !submit.getClientRects().length) return;
+    const top = submit.getBoundingClientRect().top - shell.getBoundingClientRect().top - shell.clientTop;
+    if (Math.abs(tools.offsetTop - top) > 0.1 || tools.style.bottom !== "auto") {
+      tools.style.top = `${top}px`;
+      tools.style.bottom = "auto";
+    }
+  }
   function sync() {
     frame = 0;
+    alignComposer();
     const marker = document.querySelector("#active-chat-marker [data-active-chat]");
     const next = marker?.dataset.activeChat || "";
     const changedChat = next !== active;
@@ -62,9 +98,11 @@
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-modal", "true");
       panel.setAttribute("aria-labelledby", "chat-settings-title");
+      isolateDialog(panel);
       panel.tabIndex = -1;
       panel.focus();
     } else if (!opened && dialog) {
+      restoreBackground();
       dialog = null;
       previousFocus?.focus();
     }
@@ -111,6 +149,8 @@
   schedule();
   window.__localRagWorkspace = () => {
     observer.disconnect();
+    composerResize.disconnect();
+    restoreBackground();
     if (frame) cancelAnimationFrame(frame);
     document.removeEventListener("scroll", schedule, true);
     document.removeEventListener("click", click);
