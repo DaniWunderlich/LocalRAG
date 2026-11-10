@@ -1,4 +1,4 @@
-"""HTTP transport for the Streamlit UI; all RAG logic belongs to the backend."""
+"""HTTP transport for the Gradio UI; all RAG logic belongs to the backend."""
 
 import os
 from typing import Any
@@ -38,7 +38,7 @@ class BackendClient:
         except httpx.HTTPError as exc:
             raise BackendError(
                 "The backend is unavailable or the operation timed out. "
-                "Check Documents before retrying an upload."
+                "Check the document library before retrying an upload."
             ) from exc
 
     def models(self) -> dict[str, Any]:
