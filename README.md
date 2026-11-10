@@ -27,6 +27,14 @@ are stored and indexed once, while their conversation links remain separate.
 Deleting a chat removes its unshared private originals and vectors, and keeps
 documents still used by another chat or the shared library.
 
+The pinned composer keeps chat controls within reach throughout a long
+conversation. Open the settings icon below the text field to choose a local
+chat model, rename the chat or adjust generation settings. The library icon
+opens **Include library** and is highlighted while shared documents are included.
+A round down-arrow appears above the composer when later messages are out of
+view; select it to return to the latest message. Reduced-motion preferences
+are respected. Clicking the text field keeps its neutral border.
+
 A transcript from the original session-only interface is imported into a saved
 chat when that browser session first runs the new interface. Successful message
 submissions have stable request IDs, so retrying a timed-out request does not
@@ -341,11 +349,11 @@ muted-text styling. Controls retain native labels and keyboard semantics, with
 visible focus rules and reduced-motion support. This is not a full independent
 WCAG conformance audit.
 
-The current automated suite has 69 backend tests and nine Streamlit interaction
+The current automated suite has 69 backend tests and 12 Streamlit interaction
 tests. It covers private evidence isolation, explicit library opt-in,
 shared-content deduplication, follow-up context, durable settings, safe deletion,
 interrupted-operation recovery, idempotent sends, composer uploads, isolated
-retry drafts and import of the original session-only transcript.
+retry drafts, composer settings and import of the original session-only transcript.
 
 For the additional real-service acceptance run, use the disposable
 `localrag-design-review` project with `FRONTEND_PORT=18501`, and run
@@ -354,3 +362,10 @@ as the initial acceptance script. Its phases are `initialise`, `verify` after
 restarting the test containers, and `cleanup`. It checks two real grounded
 turns using local Ollama, persistence of all 14 test chats, evidence isolation
 and preservation of shared-library originals during chat deletion.
+
+The composer controls were additionally reviewed on desktop and at 390 px using
+an isolated 24-message chat. The review covered focus styling, upward-opening
+menus, library opt-in without losing a draft, and returning to the latest
+message after scrolling upwards. The local scroll controller uses Streamlit's
+component lifecycle and contains no user-provided code or remote scripts.
+Streamlit 1.67 or later is required for the pinned bottom container.
