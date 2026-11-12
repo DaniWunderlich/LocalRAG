@@ -8,6 +8,8 @@ from typing import Any
 import gradio as gr
 
 from api_client import BackendError
+from localization import GERMAN, translate
+from navigation import RAIL_JS, chat_navigation
 from workspace import (
     FILE_TYPES,
     Draft,
@@ -95,13 +97,17 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             new_chat = gr.Button(
                 "New chat", variant="primary", icon=ASSETS / "add.svg", elem_id="new-chat"
             )
-            find_chat = gr.Textbox(label="Find a chat", placeholder="Find a chat", show_label=False)
-            chats = gr.Radio(
-                choices=[],
-                label="Conversations",
+            find_chat = gr.Textbox(
+                label="Find a chat",
+                placeholder="Find a chat",
                 show_label=False,
-                interactive=True,
+                container=False,
+                elem_id="find-chat",
+            )
+            chats = gr.HTML(
+                "",
                 elem_id="conversation-list",
+                js_on_load=RAIL_JS,
             )
             refresh = gr.Button("Refresh", size="sm")
             service_notice = gr.Markdown(elem_id="service-notice")
@@ -110,13 +116,22 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                 '<a href="#conversation-workspace" class="skip-link">Skip to conversation</a><span class="wordmark">LOCAL RAG</span>'
             )
             appearance_control = gr.Radio(
-                ["Light", "Dark", "System"],
+                [("☀", "Light"), ("☾", "Dark"), ("▣", "System")],
                 value="System",
                 label="Appearance",
                 show_label=False,
                 container=False,
                 elem_id="appearance",
                 interactive=False,
+            )
+            language_control = gr.Radio(
+                [("🇩🇪", "de"), ("🇬🇧", "en")],
+                value="en",
+                label="Language",
+                show_label=False,
+                container=False,
+                elem_id="language",
+                min_width=90,
             )
         error = gr.Textbox(
             label="Workspace notice", interactive=False, visible=False, elem_id="workspace-error"
@@ -262,48 +277,114 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             delete_confirm = gr.Checkbox(label="Delete this chat and its private files")
             delete_chat = gr.Button("Delete chat", variant="stop")
 
+        with gr.Column(visible=False, elem_id="chat-manager") as manager_panel:
+            manager_title = gr.Markdown("## Manage chat", elem_id="chat-manager-title")
+            manager_context = gr.Markdown(elem_id="chat-manager-context")
+            manager_notice = gr.Markdown(visible=False, elem_id="manager-notice")
+            with gr.Column(elem_id="manager-rename") as manager_rename:
+                manager_name = gr.Textbox(label="Chat name", max_length=120, elem_id="manager-name")
+            with gr.Column(elem_id="manager-move") as manager_move:
+                manager_folder = gr.Radio(
+                    label="Destination folder",
+                    choices=[],
+                    interactive=True,
+                    elem_id="manager-folder",
+                )
+                manager_new_folder = gr.Textbox(
+                    label="New folder name",
+                    placeholder="Enter a folder name",
+                    max_length=80,
+                    visible=False,
+                    elem_id="manager-new-folder",
+                )
+            with gr.Column(elem_id="manager-removal") as manager_removal:
+                gr.Markdown("Deleting a chat also removes private files that no other chat uses.")
+                manager_confirm = gr.Checkbox(label="Delete this chat and its private files")
+            with gr.Row(elem_id="manager-actions"):
+                manager_save = gr.Button("Save changes", variant="primary")
+                manager_delete = gr.Button("Delete chat", variant="stop", visible=False)
+                manager_close = gr.Button("Cancel", elem_id="close-chat-manager")
+
+        # Capture original component strings once; locale changes update native labels too.
+        localized: dict[Any, dict[str, Any]] = {}
+        for component in list(demo.blocks.values()):
+            fields: dict[str, Any] = {}
+            for attribute in ("label", "placeholder", "value", "headers"):
+                if attribute == "value" and not isinstance(
+                    component, (gr.Button, gr.Markdown, gr.HTML)
+                ):
+                    continue
+                value = getattr(component, attribute, None)
+                if (isinstance(value, str) and value in GERMAN) or (
+                    attribute == "headers" and isinstance(value, list)
+                ):
+                    fields[attribute] = value
+            if fields:
+                localized[component] = fields
+
+        def locale_updates(session: Session) -> dict[Any, Any]:
+            updates = {}
+            for component, fields in localized.items():
+                properties: dict[str, Any] = {
+                    key: [translate(item, session.language) for item in value]
+                    if isinstance(value, list)
+                    else translate(value, session.language)
+                    for key, value in fields.items()
+                }
+                updates[component] = gr.update(**properties)
+            return updates
+
         def render(session: Session, restore_composer: bool = False) -> dict[Any, Any]:
             """Update only native components, with durable values read from the backend."""
             conversation = session.conversation or {}
-            choices = [
-                (
-                    item["title"] + (" - deletion pending" if item["status"] != "active" else ""),
-                    item["conversation_id"],
-                )
-                for item in session.summaries
-                if session.chat_query.casefold() in item["title"].casefold()
-            ]
             model = conversation.get("model", session.model)
             names = session.models + ([model] if model and model not in session.models else [])
             pending = session.key in session.pending
-            values: dict[Any, Any] = {
+
+            def tr(value: str) -> str:
+                return translate(value, session.language)
+
+            values: dict[Any, Any] = locale_updates(session)
+            dynamic: dict[Any, Any] = {
                 state: session,
-                chats: gr.Radio(
-                    choices=choices,
-                    value=session.active_id
-                    if session.active_id in {value for _, value in choices}
-                    else None,
+                manager_notice: gr.update(value=tr(session.error), visible=bool(session.error)),
+                manager_title: "## "
+                + tr(
+                    {"rename": "Rename chat", "move": "Move to folder", "delete": "Delete chat"}[
+                        session.managed_action
+                    ]
                 ),
-                title: "# " + escape(conversation.get("title", "New chat")),
+                manager_rename: gr.update(visible=session.managed_action == "rename"),
+                manager_move: gr.update(visible=session.managed_action == "move"),
+                manager_removal: gr.update(visible=session.managed_action == "delete"),
+                manager_save: gr.update(
+                    value=tr("Move chat" if session.managed_action == "move" else "Save changes"),
+                    visible=session.managed_action != "delete",
+                ),
+                manager_delete: gr.update(visible=session.managed_action == "delete"),
+                chats: chat_navigation(session),
+                title: "# " + escape(conversation.get("title") or tr("New chat")),
                 chat: transcript(session),
                 library: gr.update(
-                    value="Exclude shared library"
+                    value=tr("Exclude shared library")
                     if session.use_library
-                    else "Include shared library",
+                    else tr("Include shared library"),
                     icon=library_icons[session.use_library],
                     variant="primary" if session.use_library else "secondary",
                 ),
-                error: gr.Textbox(value=session.error, visible=bool(session.error)),
-                service_notice: session.service_notice,
+                error: gr.update(value=tr(session.error), visible=bool(session.error)),
+                service_notice: tr(session.service_notice),
                 marker: '<span data-ready="'
                 + str(session.initialised).lower()
                 + '" data-active-chat="'
                 + escape(session.active_id or "", quote=True)
+                + '" data-language="'
+                + session.language
                 + '" data-message-count="'
                 + str(len(conversation.get("messages", [])))
                 + '"></span>',
-                attachment_panel: gr.Accordion(visible=bool(session.attachments)),
-                attachment_table: document_rows(session.attachments),
+                attachment_panel: gr.update(visible=bool(session.attachments)),
+                attachment_table: document_rows(session.attachments, session.language),
                 attachment_selection: next(
                     (
                         item["filename"]
@@ -312,7 +393,9 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                     ),
                     "",
                 ),
-                document_table: document_rows(controller.visible_documents(session)),
+                document_table: document_rows(
+                    controller.visible_documents(session), session.language
+                ),
                 document_selection: next(
                     (
                         item["filename"]
@@ -322,20 +405,29 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                     "",
                 ),
                 pending_panel: gr.update(visible=pending),
-                chat_model: gr.Dropdown(choices=names, value=model or None),
-                chat_name: gr.Textbox(
+                chat_model: gr.update(choices=names, value=model or None),
+                chat_name: gr.update(
                     value=conversation.get("title", ""), visible=bool(conversation)
                 ),
                 top_k: conversation.get("top_k", session.top_k),
                 temperature: conversation.get("temperature", session.temperature),
-                default_model: gr.Dropdown(choices=session.models, value=session.model or None),
+                default_model: gr.update(choices=session.models, value=session.model or None),
                 default_top_k: session.top_k,
                 default_temperature: session.temperature,
-                delete_chat: gr.Button(interactive=bool(session.active_id)),
+                delete_chat: gr.update(interactive=bool(session.active_id)),
                 delete_confirm: False,
             }
+            # Merge localized properties with dynamic values so labels survive updates.
+            for component, value in dynamic.items():
+                if component in values and isinstance(value, dict):
+                    values[component].update(value)
+                elif component in values:
+                    values[component]["value"] = value
+                else:
+                    values[component] = value
             if restore_composer:
-                values[composer] = gr.MultimodalTextbox(
+                values[composer] = gr.update(
+                    placeholder=tr("Ask about your documents, or attach files"),
                     value=session.drafts.get(session.key, Draft()).payload(),
                     interactive=not pending and conversation.get("status", "active") == "active",
                 )
@@ -358,9 +450,13 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                 session.error = "The temporary upload is unavailable. Attach the file again."
             return render(session, restore)
 
-        def initialise(session: Session, requested: str, mode: str) -> dict[Any, Any]:
+        def initialise(
+            session: Session, requested: str, mode: str, language: str
+        ) -> dict[Any, Any]:
             """Restore the addressable chat when the page establishes its Gradio session."""
+            session.language = language if language in {"de", "en"} else "en"
             result = perform(session, None, lambda: controller.initialise(session, requested), True)
+            result[language_control] = gr.update(value=session.language)
             result[appearance_control] = gr.Radio(
                 value=mode if mode in {"Light", "Dark", "System"} else "System", interactive=True
             )
@@ -378,8 +474,54 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             return result
 
         def select_chat(
-            session: Session, selected: str | None, payload: dict[str, Any] | None
+            session: Session, payload: dict[str, Any] | None, event: gr.EventData
         ) -> dict[Any, Any]:
+            selected = str(event.chat_id)
+            if event.action != "select":
+                session.remember(payload)
+                item = next(
+                    (item for item in session.summaries if item["conversation_id"] == selected),
+                    None,
+                )
+                if item is None:
+                    session.error = (
+                        "This chat is no longer available. Refresh the conversation list."
+                    )
+                    return render(session)
+                session.managed_id = selected
+                session.error = ""
+                session.managed_action = (
+                    event.action if event.action in {"rename", "move", "delete"} else "rename"
+                )
+                session.managed_folders = sorted(
+                    {item["folder"] for item in session.summaries if item.get("folder")},
+                    key=str.casefold,
+                )
+                result = render(session)
+                result.update(
+                    {
+                        manager_panel: gr.update(visible=True),
+                        manager_context: escape(item["title"]),
+                        manager_name: gr.update(value=item["title"]),
+                        manager_folder: gr.update(
+                            choices=[
+                                (translate("No folder", session.language), "none"),
+                                *(
+                                    (folder, f"folder:{index}")
+                                    for index, folder in enumerate(session.managed_folders)
+                                ),
+                                (translate("Create new folder", session.language), "new"),
+                            ],
+                            value=f"folder:{session.managed_folders.index(item['folder'])}"
+                            if item.get("folder")
+                            else "none",
+                        ),
+                        manager_new_folder: gr.update(value="", visible=False),
+                        manager_confirm: False,
+                        manager_notice: gr.update(value="", visible=False),
+                    }
+                )
+                return result
             result = perform(
                 session,
                 payload,
@@ -439,7 +581,9 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             session.selected_document = None
             return {
                 state: session,
-                document_table: document_rows(controller.visible_documents(session)),
+                document_table: document_rows(
+                    controller.visible_documents(session), session.language
+                ),
                 document_selection: "",
                 delete_document_confirm: False,
             }
@@ -495,8 +639,8 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             try:
                 sources = controller.client.search(text, session.top_k) if text.strip() else []
                 return {
-                    search_results: source_details(sources, session.show_sources)
-                    or "No shared-library excerpts were found."
+                    search_results: source_details(sources, session.show_sources, session.language)
+                    or translate("No shared-library excerpts were found.", session.language)
                 }
             except BackendError as failure:
                 return {error: gr.Textbox(value=str(failure), visible=True)}
@@ -544,7 +688,22 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             library_upload,
             search_results,
             appearance_control,
+            language_control,
+            manager_panel,
+            manager_title,
+            manager_name,
+            manager_folder,
+            manager_confirm,
+            manager_notice,
+            manager_context,
+            manager_rename,
+            manager_move,
+            manager_removal,
+            manager_save,
+            manager_delete,
+            manager_new_folder,
         ]
+        outputs = list(dict.fromkeys([*outputs, *localized]))
         options: dict[str, Any] = {
             "outputs": outputs,
             "api_visibility": "private",
@@ -554,8 +713,8 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
         }
         demo.load(
             initialise,
-            inputs=[state, requested_chat, appearance_control],
-            js='(state) => {let mode="System";try {mode=(localStorage.getItem("localrag-appearance")||"system");mode=mode.charAt(0).toUpperCase()+mode.slice(1)}catch{}return [state,new URL(window.location.href).searchParams.get("chat")||"",mode]}',
+            inputs=[state, requested_chat, appearance_control, language_control],
+            js='(state) => {let mode="System",lang="en";try {mode=(localStorage.getItem("localrag-appearance")||"system");mode=mode.charAt(0).toUpperCase()+mode.slice(1);lang=localStorage.getItem("localrag-language")||(navigator.language.startsWith("de")?"de":"en")}catch{}return [state,new URL(window.location.href).searchParams.get("chat")||"",mode,lang]}',
             **options,
         )
         appearance_control.input(
@@ -567,7 +726,106 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             api_visibility="private",
         )
         new_chat.click(create_chat, inputs=[state, composer], **options)
-        chats.input(select_chat, inputs=[state, chats, composer], **options)
+        chats.click(select_chat, inputs=[state, composer], **options)
+
+        def change_language(
+            session: Session, payload: dict[str, Any] | None, language: str
+        ) -> dict[Any, Any]:
+            session.remember(payload)
+            session.language = language if language in {"de", "en"} else "en"
+            return render(session)
+
+        language_control.input(
+            change_language,
+            inputs=[state, composer, language_control],
+            js='(state,payload,language) => {try{localStorage.setItem("localrag-language",language)}catch{} return [state,payload,language]}',
+            **options,
+        )
+
+        def save_managed(
+            session: Session,
+            payload: dict[str, Any] | None,
+            name: str,
+            folder: str | None,
+            new_folder: str,
+        ) -> dict[Any, Any]:
+            def apply() -> None:
+                item = next(
+                    (
+                        item
+                        for item in session.summaries
+                        if item["conversation_id"] == session.managed_id
+                    ),
+                    None,
+                )
+                if item is None:
+                    raise BackendError(
+                        "This chat is no longer available. Refresh the conversation list."
+                    )
+                if session.managed_action == "rename":
+                    controller.manage_chat(session, name, item.get("folder", ""))
+                    return
+                if folder == "new":
+                    destination = new_folder.strip()
+                    if not destination:
+                        raise BackendError("Enter a folder name.")
+                elif folder == "none":
+                    destination = ""
+                else:
+                    choices = {
+                        f"folder:{index}": value
+                        for index, value in enumerate(session.managed_folders)
+                    }
+                    if folder not in choices:
+                        raise BackendError("Choose a destination folder.")
+                    destination = choices[str(folder)]
+                controller.manage_chat(session, item["title"], destination)
+
+            result = perform(session, payload, apply)
+            result[manager_panel] = gr.update(visible=bool(session.error))
+            result[error] = gr.update(visible=False)
+            return result
+
+        def delete_managed(
+            session: Session, payload: dict[str, Any] | None, confirmed: bool
+        ) -> dict[Any, Any]:
+            was_active = session.managed_id == session.active_id
+            result = perform(
+                session,
+                payload,
+                lambda: controller.delete_managed_chat(session, confirmed),
+                was_active,
+            )
+            result[manager_panel] = gr.update(visible=bool(session.error))
+            result[error] = gr.update(visible=False)
+            return result
+
+        manager_save.click(
+            save_managed,
+            inputs=[state, composer, manager_name, manager_folder, manager_new_folder],
+            **options,
+        )
+        manager_folder.input(
+            lambda choice: gr.update(visible=choice == "new"),
+            inputs=manager_folder,
+            outputs=manager_new_folder,
+            queue=False,
+            api_visibility="private",
+        )
+        manager_delete.click(delete_managed, inputs=[state, composer, manager_confirm], **options)
+
+        def close_manager(session: Session) -> dict[Any, Any]:
+            session.error = ""
+            session.managed_id = None
+            return {state: session, manager_panel: gr.update(visible=False)}
+
+        manager_close.click(
+            close_manager,
+            inputs=state,
+            outputs=[state, manager_panel],
+            queue=False,
+            api_visibility="private",
+        )
         composer.submit(submit, inputs=[state, composer], **options)
         settings.click(open_settings, inputs=[state, composer], **options)
         close.click(

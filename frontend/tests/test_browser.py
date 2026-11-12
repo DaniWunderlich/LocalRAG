@@ -157,14 +157,14 @@ def test_chat_switching_keeps_independent_composer_drafts(page: Page) -> None:
     page.locator("#composer textarea").fill("Unsent visual review question")
     if not page.locator("#conversation-rail").evaluate("e=>e.classList.contains('open')"):
         page.get_by_role("button", name="Toggle Sidebar", exact=True).click()
-    page.get_by_role("radio", name="Shared Gradio acceptance", exact=True).check()
+    page.get_by_role("button", name="Shared Gradio acceptance", exact=True).click()
     expect(page.locator("#chat-title")).to_contain_text("Shared Gradio acceptance")
     expect(page.locator("#composer textarea")).to_have_value("")
     expect(page.get_by_role("button", name="Exclude shared library", exact=True)).to_be_visible()
     page.locator("#composer textarea").fill("Unsent shared-library question")
     if not page.locator("#conversation-rail").evaluate("e=>e.classList.contains('open')"):
         page.get_by_role("button", name="Toggle Sidebar", exact=True).click()
-    page.get_by_role("radio", name="Orion visual review", exact=True).check()
+    page.get_by_role("button", name="Orion visual review", exact=True).click()
     expect(page.locator("#chat-title")).to_contain_text("Orion visual review")
     expect(page.locator("#composer textarea")).to_have_value("Unsent visual review question")
     expect(page.get_by_role("button", name="Include shared library", exact=True)).to_be_visible()

@@ -13,6 +13,11 @@
   const composerResize = new ResizeObserver(() => schedule());
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   let mode = "system";
+  let language = "en";
+  const labels = {
+    en: {Light:"Light", Dark:"Dark", System:"System", jump:"Jump to latest message"},
+    de: {Light:"Hell", Dark:"Dunkel", System:"System", jump:"Zur neuesten Nachricht springen"}
+  };
   try { mode = localStorage.getItem("localrag-appearance") || "system"; } catch { /* Storage may be unavailable. */ }
   if (!["light", "dark", "system"].includes(mode)) mode = "system";
 
@@ -90,14 +95,25 @@
       nearEnd = scrolling.scrollHeight - scrolling.clientHeight - scrolling.scrollTop < 80;
       button.hidden = !messages || nearEnd;
     }
-    const panel = document.getElementById("chat-settings");
+    language = marker?.dataset.language || "en";
+    root.lang = language;
+    document.querySelectorAll('#appearance input, #language input').forEach(input => {
+      const name = input.closest('#appearance') ? labels[language][input.value] : (input.value === 'de' ? 'Deutsch' : 'English');
+      if (name) {
+        input.setAttribute('aria-label', name);
+        input.closest('label').title = name;
+      }
+    });
+    const jump = document.getElementById('jump-to-latest');
+    if (jump) { jump.title = labels[language].jump; jump.setAttribute('aria-label', labels[language].jump); }
+    const panel = [document.getElementById("chat-manager"), document.getElementById("chat-settings")].find(panel => panel?.getClientRects().length > 0);
     const opened = panel && panel.getClientRects().length > 0;
     if (opened && dialog !== panel) {
       previousFocus = document.activeElement;
       dialog = panel;
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-modal", "true");
-      panel.setAttribute("aria-labelledby", "chat-settings-title");
+      panel.setAttribute("aria-labelledby", panel.id === 'chat-manager' ? "chat-manager-title" : "chat-settings-title");
       isolateDialog(panel);
       panel.tabIndex = -1;
       panel.focus();
@@ -114,6 +130,7 @@
   }
   function schedule() { if (!frame) frame = requestAnimationFrame(sync); }
   function click(event) {
+    if (!event.target.closest('.chat-menu')) document.querySelectorAll('.chat-menu[open]').forEach(menu => menu.removeAttribute('open'));
     if (event.target.closest("#jump-to-latest")) {
       const scrolling = scrollRoot();
       scrolling?.scrollTo({top:scrolling.scrollHeight, behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
@@ -122,12 +139,12 @@
   function keys(event) {
     if (!dialog) return;
     if (event.key === "Escape" && dialog.querySelector('[role="listbox"]')) return;
-    if (event.key === "Escape") document.getElementById("close-chat-settings")?.click();
+    if (event.key === "Escape") dialog.querySelector('#close-chat-settings, #close-chat-manager')?.click();
     if (event.key !== "Tab") return;
     const controls = [...dialog.querySelectorAll("input,select,textarea,button,[tabindex='0']")].filter(node => !node.disabled && node.getClientRects().length);
     const first = controls[0], last = controls.at(-1);
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first?.focus(); }
   }
   const observer = new MutationObserver(() => {
     const marker = document.querySelector("#active-chat-marker [data-active-chat]");

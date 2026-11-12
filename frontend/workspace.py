@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from api_client import BackendClient, BackendError
+from localization import translate
 
 FILE_TYPES = [".pdf", ".docx", ".txt", ".md", ".markdown"]
 
@@ -58,6 +59,10 @@ class Session:
     library_query: str = ""
     selected_document: str | None = None
     selected_attachment: str | None = None
+    language: str = "en"
+    managed_id: str | None = None
+    managed_action: str = "rename"
+    managed_folders: list[str] = field(default_factory=list)
     drafts: dict[str, Draft] = field(default_factory=dict)
     pending: dict[str, Submission] = field(default_factory=dict)
 
@@ -83,7 +88,7 @@ def read_draft(payload: dict[str, Any] | None) -> Draft:
     return Draft(str(value.get("text") or ""), [str(path) for path in value.get("files", [])])
 
 
-def source_details(sources: list[dict[str, Any]], show_text: bool) -> str:
+def source_details(sources: list[dict[str, Any]], show_text: bool, language: str = "en") -> str:
     """Escape evidence snapshots before adding a compact, accessible disclosure."""
     if not sources:
         return ""
@@ -91,14 +96,16 @@ def source_details(sources: list[dict[str, Any]], show_text: bool) -> str:
     for index, source in enumerate(sources, 1):
         label = f"[{source.get('source_id') or index}] {source['filename']}"
         if source.get("page"):
-            label += f" - page {source['page']}"
-        location = source.get("section") or f"Chunk {source['chunk_index'] + 1}"
+            label += f" - {translate('page', language)} {source['page']}"
+        location = (
+            source.get("section") or f"{translate('Chunk', language)} {source['chunk_index'] + 1}"
+        )
         entries.append(
-            f"<p><strong>{escape(label)}</strong><br>{escape(location)} - similarity {source['score']:.3f}</p>"
+            f"<p><strong>{escape(label)}</strong><br>{escape(location)} - {translate('similarity', language)} {source['score']:.3f}</p>"
         )
         if show_text:
             entries.append(f"<pre>{escape(source['text'])}</pre>")
-    return f"\n\n<details><summary>Sources ({len(sources)})</summary>{''.join(entries)}</details>"
+    return f"\n\n<details><summary>{translate('Sources', language)} ({len(sources)})</summary>{''.join(entries)}</details>"
 
 
 def transcript(session: Session) -> list[dict[str, str]]:
@@ -109,13 +116,13 @@ def transcript(session: Session) -> list[dict[str, str]]:
         {
             "role": message["role"],
             "content": message["content"]
-            + source_details(message.get("sources", []), session.show_sources),
+            + source_details(message.get("sources", []), session.show_sources, session.language),
         }
         for message in session.conversation["messages"]
     ]
 
 
-def document_rows(documents: list[dict[str, Any]]) -> list[list[str | int]]:
+def document_rows(documents: list[dict[str, Any]], language: str = "en") -> list[list[str | int]]:
     """Keep document selection aligned with the visible, deterministic row order."""
     return [
         [
@@ -124,8 +131,8 @@ def document_rows(documents: list[dict[str, Any]]) -> list[list[str | int]]:
             if item["size_bytes"] >= 1024
             else f"{item['size_bytes']} B",
             item["chunk_count"],
-            item["status"],
-            item.get("error") or "",
+            translate(item["status"], language),
+            translate(item.get("error") or "", language),
         ]
         for item in documents
     ]
@@ -326,6 +333,35 @@ class Workspace:
         session.selected_attachment = None
         session.error = ""
         self.refresh(session)
+
+    def manage_chat(self, session: Session, title: str, folder: str) -> None:
+        """Edit the explicitly targeted sidebar chat, independently of the open transcript."""
+        target = session.managed_id
+        if target not in {item["conversation_id"] for item in session.summaries}:
+            raise BackendError("This chat is no longer available. Refresh the conversation list.")
+        if not title.strip() or len(title.strip()) > 120:
+            raise BackendError("Use a chat name with 1 to 120 characters.")
+        if len(folder.strip()) > 80:
+            raise BackendError("Folder names may contain up to 80 characters.")
+        current = next(item for item in session.summaries if item["conversation_id"] == target)
+        fields = {"folder": folder.strip()}
+        if current["title"] != title.strip():
+            fields["title"] = title.strip()
+        self.client.update_conversation(str(target), **fields)
+        self.refresh(session)
+
+    def delete_managed_chat(self, session: Session, confirmed: bool) -> None:
+        """Delete the menu's target without switching chats or losing another chat's draft."""
+        target = session.managed_id
+        if not confirmed or target not in {item["conversation_id"] for item in session.summaries}:
+            raise BackendError(
+                "Confirm that this chat and its unshared private files should be deleted."
+            )
+        self.client.delete_conversation(str(target))
+        session.pending.pop(str(target), None)
+        session.drafts.pop(str(target), None)
+        self.refresh(session)
+        session.managed_id = None
 
     def visible_documents(self, session: Session) -> list[dict[str, Any]]:
         """Apply the same filter to the library table and its selection mapping."""

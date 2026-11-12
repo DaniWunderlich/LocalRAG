@@ -32,6 +32,7 @@ class BackendDouble:
             {
                 "conversation_id": key,
                 "title": value["title"],
+                "folder": value.get("folder", ""),
                 "message_count": len(value["messages"]),
                 "document_count": len(value["document_ids"]),
                 "status": "active",
@@ -44,6 +45,7 @@ class BackendDouble:
         chat = {
             "conversation_id": key,
             "title": "New chat",
+            "folder": "",
             "model": model,
             "top_k": top_k,
             "temperature": temperature,
@@ -122,6 +124,7 @@ def fake_backend() -> Iterator[BackendDouble]:
         "conversation": lambda key: deepcopy(backend.chats[key]),
         "create_conversation": backend.create,
         "update_conversation": backend.update,
+        "delete_conversation": lambda key: (backend.chats.pop(key), backend.documents.pop(key)),
         "attachments": lambda key: deepcopy(backend.documents[key]),
         "upload_attachment": backend.upload,
         "send_message": backend.send,
