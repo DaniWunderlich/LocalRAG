@@ -17,6 +17,18 @@ Re-uploading a failed document retries its existing record.
 Multiple independent chats are saved locally, including transcripts, evidence
 snapshots, attachment links, model choice and generation settings. Create,
 switch, search, rename and delete chats from the conversation workspace.
+Each sidebar chat has a three-dot menu for renaming, moving to a folder and
+deleting. Each action opens its own compact dialog. To move a chat, select an
+existing destination or **Create new folder** and enter its name; **No folder** removes
+the grouping. Folder assignments are saved with the chat, and folders can be
+collapsed in the sidebar. Deletion requires confirmation and retains the
+existing cleanup rules for shared and private documents. Managing another
+chat preserves the open conversation and its unsent draft.
+The selected chat has a complete accent border. Its menu floats below the
+three-dot button in the browser's top layer, so opening it does not add sidebar
+overflow or shift other chats. Near the screen's lower edge it opens upward
+to keep every action visible. Appearance and language selections also use a
+complete border; keyboard focus is drawn inside the icon without clipped edges.
 Recent turns are included within a bounded history budget to interpret
 follow-up questions; factual answers still rely on the current source excerpts.
 
@@ -37,10 +49,15 @@ composer when later messages are out of view; select it to return to the latest
 message. Reduced-motion preferences are respected. Clicking the text field
 keeps its neutral border.
 
-Use the appearance buttons at the top right to choose **Light**, **Dark** or **System**.
+Use the sun, moon and monitor icons at the top right to choose **Light**, **Dark** or **System**.
 The browser remembers this preference across pages and reloads. Both appearances
 use the reading-desk palette throughout the chat, library, forms and dialogs.
 This preference is separate from saved chat settings.
+The adjacent German and British flag icons select German or English interface
+text. The browser remembers the language, initially following its German or
+English preference (other browser languages use English). User messages,
+answers, filenames and saved chat names keep their original text. The sidebar
+search uses the rail background without a contrasting box or border.
 
 The v0.1.0 interface imported transcripts from the original session-only UI
 into saved chats. Gradio restores these backend records through the same API.
@@ -212,7 +229,7 @@ record before retrying.
 | POST | `/api/v1/search` | Retrieve ranked excerpts and metadata |
 | POST | `/api/v1/chat` | Generate an answer with the supplied context sources |
 | GET / POST | `/api/v1/conversations` | List / create persistent chats |
-| GET / PATCH / DELETE | `/api/v1/conversations/{id}` | Restore, rename, configure or delete a chat |
+| GET / PATCH / DELETE | `/api/v1/conversations/{id}` | Restore, rename, set folder, configure or delete a chat |
 | GET / POST | `/api/v1/conversations/{id}/documents` | Inspect / upload private chat attachments |
 | DELETE | `/api/v1/conversations/{id}/documents/{document_id}` | Detach a document and clean up unshared originals |
 | POST | `/api/v1/conversations/{id}/messages` | Idempotent question with bounded chat history |
@@ -361,7 +378,7 @@ muted-text styling. Controls retain native labels and keyboard semantics, with
 visible focus rules and reduced-motion support. This is not a full independent
 WCAG conformance audit.
 
-The offline automated suite has 69 backend tests and 18 frontend tests. It covers private evidence isolation, explicit library opt-in,
+The offline automated suite has 71 backend tests and 22 frontend tests. It covers folder persistence, compatibility with existing chat records, targeted chat management, localized navigation, private evidence isolation, explicit library opt-in,
 shared-content deduplication, follow-up context, durable settings, safe deletion,
 interrupted-operation recovery, idempotent sends, composer uploads, isolated
 retry drafts, composer settings and import of the original session-only transcript.
@@ -384,9 +401,10 @@ disabled. The frontend serves local assets and system fonts.
 
 ## Gradio migration and browser acceptance
 
-Version 0.2.0 development replaces the Streamlit frontend from the published
-v0.1.0 baseline. Backend endpoints, document records, conversation records,
-Qdrant configuration, model compatibility and existing volumes are unchanged.
+Version **0.2.0** replaces the Streamlit frontend from the published
+v0.1.0 baseline. Existing API routes, document records, Qdrant configuration,
+model compatibility and existing volumes are preserved. Conversation records
+gain an optional folder field; older records load as ungrouped chats.
 No reindexing or data conversion is required. The original vision and initial
 specification describe the v0.1.0 stack; this frontend decision supersedes their
 Streamlit references.
@@ -399,14 +417,35 @@ unfinished browser requests are temporary and do not survive a frontend restart;
 committed messages and documents remain in the backend volume. Gradio's temporary
 upload cache is cleaned periodically after 24 hours. Reattach expired uploads.
 
-Update an existing local installation without changing its backend or volumes:
+Update the frontend and backend together for persistent folder support,
+preserving the existing volumes and Qdrant service:
 
 ```powershell
-docker compose up -d --build --no-deps --wait frontend
+docker compose up -d --build --no-deps --wait backend frontend
 ```
 
 Keep the original v0.1.0 checkout or frontend image available if you need to
 restore that UI. Both frontends use the same saved-chat API and storage format.
+Existing chat records without a folder load as ungrouped; no reindexing or
+conversion is required.
+
+Sixteen additional browser tests exercise the new navigation with an isolated
+in-memory backend and artificial chats, without Docker or Ollama. They cover
+both appearances at 1440 and 390 px, language and appearance persistence,
+renaming, folder creation/removal, confirmed deletion and independent drafts.
+They also check uniform selection borders, keyboard focus and fully visible
+menus without added sidebar overflow at desktop, mobile and 1.25 device scale,
+including long chat lists.
+The folder-dialog cases also check existing destinations, new-name validation,
+cancellation and non-overlapping controls in both appearances at desktop,
+mobile and 1.25 device scale:
+
+```powershell
+uv run --project frontend playwright install chromium
+$env:LOCALRAG_UI_TESTS = "1"
+uv run --project frontend pytest frontend/tests/test_navigation_browser.py --basetemp=.tmp/pytest-navigation -q
+Remove-Item Env:LOCALRAG_UI_TESTS
+```
 
 For real-service and browser acceptance, create a disposable project containing
 only artificial documents. Use the existing local Ollama service:
