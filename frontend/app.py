@@ -1,23 +1,40 @@
-"""Shared application shell with a conversation-first information architecture."""
+"""Serve the Gradio workspace and a lightweight container liveness endpoint."""
 
-import streamlit as st
+import os
+import tempfile
+from pathlib import Path
 
-from ui import apply_design
-from workspace import render
+os.environ.setdefault("GRADIO_ANALYTICS_ENABLED", "False")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+os.environ.setdefault("GRADIO_TEMP_DIR", str(Path(tempfile.gettempdir()) / "localrag-uploads"))
 
-st.set_page_config(
-    page_title="Local RAG",
-    page_icon=":material/book_2:",
-    layout="wide",
-    initial_sidebar_state="auto",
+import gradio as gr
+from fastapi import FastAPI
+
+from ui import ROOT, create_workspace, reading_theme
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+
+@app.get("/health/live")
+def live() -> dict[str, str]:
+    """Keep UI liveness independent of backend and model availability."""
+    return {"status": "alive"}
+
+
+app = gr.mount_gradio_app(
+    app,
+    create_workspace(),
+    path="/",
+    server_port=7860,
+    theme=reading_theme(),
+    css_paths=ROOT / "styles.css",
+    js=(ROOT / "workspace.js").read_text(encoding="utf-8"),
+    footer_links=[],
+    show_error=False,
+    max_file_size="20mb",
+    ssr_mode=False,
+    pwa=False,
+    mcp_server=False,
+    enable_monitoring=False,
 )
-apply_design()
-page = st.navigation(
-    [
-        st.Page(render, title="Chats", icon=":material/chat_bubble:", default=True),
-        st.Page("pages/1_Documents.py", title="Library", icon=":material/folder_open:"),
-        st.Page("pages/2_Settings.py", title="Settings", icon=":material/tune:"),
-    ],
-    position="top",
-)
-page.run()

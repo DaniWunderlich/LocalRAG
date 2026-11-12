@@ -1,5 +1,6 @@
 """Persistent threads, evidence isolation, retry semantics and private file lifecycle."""
 
+import json
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -15,6 +16,41 @@ def create(harness: Harness, **fields: object) -> str:
     response = harness.client.post("/api/v1/conversations", json={"model": "chat:test", **fields})
     assert response.status_code == 201, response.text
     return response.json()["conversation_id"]
+
+
+def test_folder_and_rename_persist_without_changing_other_chats(harness: Harness) -> None:
+    first, second = create(harness), create(harness)
+    endpoint = f"/api/v1/conversations/{first}"
+    changed = harness.client.patch(endpoint, json={"title": "Projektübersicht", "folder": "Arbeit"})
+    assert changed.status_code == 200
+    store = ConversationStore(harness.services.settings.document_storage_path)
+    restored = store.get(UUID(first))
+    assert restored is not None
+    assert (restored.title, restored.folder, restored.automatic_title) == (
+        "Projektübersicht",
+        "Arbeit",
+        False,
+    )
+    assert harness.client.get(f"/api/v1/conversations/{second}").json()["folder"] == ""
+    summaries = {
+        item["conversation_id"]: item for item in harness.client.get("/api/v1/conversations").json()
+    }
+    assert summaries[first]["folder"] == "Arbeit"
+    assert harness.client.patch(endpoint, json={"folder": ""}).json()["folder"] == ""
+    assert harness.client.patch(endpoint, json={"folder": "x" * 81}).status_code == 422
+    assert harness.client.patch(endpoint, json={"title": "  "}).status_code == 422
+
+
+def test_pre_folder_records_load_without_conversion(harness: Harness) -> None:
+    key = create(harness)
+    store = harness.services.chats
+    path = store.path / f"{key}.json"
+    record = json.loads(path.read_bytes())
+    del record["folder"]
+    path.write_text(json.dumps(record), encoding="utf-8")
+    restored = store.get(UUID(key))
+    assert restored is not None and restored.folder == ""
+    assert harness.client.get("/api/v1/conversations").json()[0]["folder"] == ""
 
 
 def attach(
