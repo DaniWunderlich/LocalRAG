@@ -95,6 +95,7 @@ class Conversation(BaseModel):
 
     conversation_id: UUID
     title: str = "New chat"
+    folder: str = Field(default="", max_length=80)
     automatic_title: bool = True
     created_at: datetime
     updated_at: datetime
@@ -112,6 +113,7 @@ class ConversationSummary(BaseModel):
 
     conversation_id: UUID
     title: str
+    folder: str = ""
     updated_at: datetime
     message_count: int
     document_count: int
@@ -132,6 +134,7 @@ class ConversationUpdate(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     title: str | None = Field(default=None, min_length=1, max_length=120)
+    folder: str | None = Field(default=None, max_length=80)
     model: str | None = Field(default=None, min_length=1, max_length=200)
     top_k: int | None = Field(default=None, ge=1, le=20)
     temperature: float | None = Field(default=None, ge=0, le=1)

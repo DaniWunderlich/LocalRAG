@@ -39,6 +39,7 @@ class ConversationStore:
             ConversationSummary(
                 conversation_id=item.conversation_id,
                 title=item.title,
+                folder=item.folder,
                 updated_at=item.updated_at,
                 message_count=len(item.messages),
                 document_count=len(item.document_ids),
