@@ -230,16 +230,18 @@ Configuration is read from environment variables and validated at startup.
 | `RAG_TEMPERATURE` | `0.2` | Generation temperature, range 0?1 |
 | `RAG_CONTEXT_TOKENS` | `4096` | Maximum estimated excerpt budget |
 | `RAG_ANSWER_TOKENS` | `1024` | Reserved output tokens |
-| `MAX_UPLOAD_BYTES` | `20971520` | Backend limit, initially 20 MiB |
+| `MAX_UPLOAD_BYTES` | `20971520` | Shared frontend/backend per-file limit, initially 20 MiB |
 | `DOCUMENT_STORAGE_PATH` | Native: `data/documents`; Compose: persistent volume | Originals and register |
 | `FRONTEND_PORT` | `8501` | Loopback browser port |
 | `BACKEND_URL` | Native: `http://localhost:8000`; Compose: internal backend | Frontend HTTP destination |
 | `BACKEND_TIMEOUT_SECONDS` | `600` | Timeout for synchronous frontend requests |
 
-Gradio also caps temporary uploads at 20 MiB in `frontend/app.py`.
-Align that value if you deliberately increase the backend limit. Large or
-complex documents can exceed synchronous request timeouts; inspect their
-record before retrying.
+Compose passes `MAX_UPLOAD_BYTES` to both services. Gradio ingress, initial
+workspace validation and the backend use this byte limit; the library displays
+the backend-reported limit in either interface language. Restart both services
+after changing it. For native development, set the same value in both process
+environments. Large or complex documents can exceed synchronous request
+timeouts; inspect their record before retrying.
 
 ## API and health
 
@@ -273,6 +275,14 @@ records under `chats/` and any reindex registry backups. Back up chat records
 together with the document register; they include message and evidence history. The `qdrant_data` volume contains vectors, payloads
 and collection configuration. Both survive normal restarts and `down`.
 Qdrant needs suitable local block storage rather than an ordinary NFS volume.
+
+Unreadable chat records are omitted from navigation without blocking healthy
+chats or startup recovery. The original record stays in place; opening it
+returns a controlled `409 chat_record_unreadable`. Backend warnings identify
+only the record filename and error type, without transcript content. Restore or
+repair that record from backup. Private-file cleanup is blocked while references
+in any chat record cannot be checked; this prevents deleting another chat's
+attachments. Library documents retain their existing deletion rules.
 
 Back up both volumes and the relevant configuration as a consistent set.
 A Qdrant backup alone cannot restore the originals or complete document
