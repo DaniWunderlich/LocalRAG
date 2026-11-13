@@ -50,6 +50,12 @@ class Services:
 
     async def delete_conversation(self, conversation: Conversation) -> None:
         """Retain a deletion marker until all unshared attachments are removed."""
+        if any(
+            (meta := self.registry.get(document_id)) is not None and not meta.in_library
+            for document_id in conversation.document_ids
+        ):
+            # Missing references must never turn shared private files into apparent orphans.
+            self.chats.all()
         self.chats.save(conversation.model_copy(update={"status": "deleting"}))
         for document_id in conversation.document_ids:
             await self.remove_private_document(document_id, conversation.conversation_id)
@@ -57,7 +63,7 @@ class Services:
 
     def prune_missing_attachments(self) -> None:
         """Remove stale links after document deletion while retaining message snapshots."""
-        for conversation in self.chats.all():
+        for conversation in self.chats.all(strict=False):
             existing_ids = [
                 document_id
                 for document_id in conversation.document_ids
@@ -88,7 +94,7 @@ class Services:
                     logger.warning(
                         "document_cleanup_pending", extra={"document_id": str(meta.document_id)}
                     )
-        for conversation in self.chats.all():
+        for conversation in self.chats.all(strict=False):
             if conversation.status == "deleting":
                 try:
                     await self.delete_conversation(conversation)
