@@ -221,11 +221,16 @@ def test_upload_does_not_silently_replace_a_missing_index(harness: Harness) -> N
     assert response.json()["code"] == "index_missing"
 
 
-def test_no_context_does_not_call_generation(harness: Harness) -> None:
+def test_no_documents_calls_general_generation(harness: Harness) -> None:
     response = harness.client.post("/api/v1/chat", json={"message": "When?"})
     assert response.status_code == 200
     assert response.json()["sources"] == []
-    assert not any(path == "/api/chat" for path, _ in harness.ollama.requests)
+    assert response.json()["answer"] == harness.ollama.general_answer
+    calls = [body for path, body in harness.ollama.requests if path == "/api/chat"]
+    assert len(calls) == 1
+    assert calls[0]["messages"][-1]["content"] == "When?"
+    assert "general knowledge" in calls[0]["messages"][0]["content"]
+    assert not any(path == "/api/embed" for path, _ in harness.ollama.requests)
 
 
 def test_unknown_source_citation_is_rejected(harness: Harness) -> None:

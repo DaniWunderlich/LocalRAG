@@ -267,6 +267,7 @@ async def send_message(
             services.ollama,
             services.settings,
             history=history,
+            allow_general=not document_ids,
         )
         now = datetime.now(UTC)
         turns = [
