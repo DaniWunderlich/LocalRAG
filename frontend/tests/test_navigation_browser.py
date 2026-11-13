@@ -22,6 +22,33 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def test_library_upload_hint_follows_backend_limit_in_both_languages(
+    isolated_ui: tuple[str, BackendDouble],
+) -> None:
+    url, _ = isolated_ui
+    models = {
+        "models": ["chat:test"],
+        "default_model": "chat:test",
+        "defaults": {"top_k": 7, "temperature": 0.3, "max_upload_bytes": 32 * 1024 * 1024},
+    }
+    with (
+        patch.object(BackendClient, "models", return_value=models),
+        sync_playwright() as playwright,
+    ):
+        browser = playwright.chromium.launch()
+        page = browser.new_page(locale="en-GB")
+        try:
+            page.goto(url)
+            expect(page.locator('#active-chat-marker [data-ready="true"]')).to_be_attached()
+            page.get_by_role("tab", name="Library", exact=True).click()
+            hint = page.locator("#library-upload-hint")
+            expect(hint).to_contain_text("Up to 32 MiB per file.")
+            page.locator("#language").get_by_label("Deutsch", exact=True).check()
+            expect(hint).to_contain_text("Bis zu 32 MiB pro Datei.")
+        finally:
+            browser.close()
+
+
 def test_waiting_respects_reduced_motion_and_deliberate_focus_changes(
     isolated_ui: tuple[str, BackendDouble],
 ) -> None:
