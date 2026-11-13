@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0 — 2026-11-13
+
+- Send chat messages with Enter and insert newlines with Shift+Enter, preserving input composition and preventing repeated-key submissions.
+- Show an animated response indicator above the composer while submitting, retain input focus after Enter or the submit icon, and keep questions available for retry after a failure. Respect deliberate focus changes and reduced-motion preferences.
+- Answer general questions with the selected local LLM when no documents are selected, retaining chat history and switching automatically to grounded answers when documents are included.
+- Show general-chat guidance and localize the standard no-context response for unsupported document questions.
+
 ## v0.2.0 — 2026-11-12
 
 ### Added

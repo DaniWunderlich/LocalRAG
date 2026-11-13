@@ -74,7 +74,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             await bundle.qdrant.close()
             logger.removeHandler(handler)
 
-    app = FastAPI(title="Local RAG", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Local RAG", version="0.3.0", lifespan=lifespan)
     for router in (
         documents.router,
         search.router,

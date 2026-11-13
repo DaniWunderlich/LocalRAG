@@ -1,6 +1,6 @@
 [project]
 name = "rag-frontend"
-version = "0.2.0"
+version = "0.3.0"
 description = "Gradio interface for local document questions and source inspection."
 requires-python = ">=3.14,<3.15"
 dependencies = ["gradio==6.31.0", "httpx==0.28.1", "fastapi==0.162.3", "uvicorn[standard]==0.54.0"]
