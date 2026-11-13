@@ -1,6 +1,9 @@
 """Explicit UI translations; user messages, chat names and filenames stay original."""
 
 GERMAN = {
+    "Creating a reply…": "Antwort wird erstellt…",
+    "General chat: ask any question, or attach documents for document answers.": "Allgemeiner Chat: Stelle eine Frage oder hänge Dokumente für dokumentbasierte Antworten an.",
+    "The documents do not provide enough context to answer this question.": "Die ausgewählten Dokumente liefern nicht genügend Kontext, um diese Frage zu beantworten.",
     "Rename chat": "Chat umbenennen",
     "Destination folder": "Zielordner",
     "New folder name": "Neuer Ordnername",
@@ -39,12 +42,12 @@ GERMAN = {
     "Remove this attachment from the chat": "Diesen Anhang aus dem Chat entfernen",
     "Remove attachment": "Anhang entfernen",
     "Conversation": "Gespräch",
-    "Attach a document below, then ask a question. Chats are saved on this computer.": "Hänge unten ein Dokument an und stelle eine Frage. Chats werden auf diesem Computer gespeichert.",
+    "Ask a question to start. Attach documents for answers based on your files.": "Stelle eine Frage, um zu beginnen. Hänge Dokumente für Antworten auf Basis deiner Dateien an.",
     "The unfinished submission stays with this chat. Retry it using the same request ID, or discard it.": "Die unvollständige Anfrage bleibt bei diesem Chat. Versuche sie erneut oder verwirf den Entwurf.",
     "Retry submission": "Erneut versuchen",
     "Discard draft": "Entwurf verwerfen",
     "Message": "Nachricht",
-    "Ask about your documents, or attach files": "Frage zu deinen Dokumenten oder hänge Dateien an",
+    "Ask a question, or attach documents": "Stelle eine Frage oder hänge Dokumente an",
     "Chat model and settings": "Chat-Modell und Einstellungen",
     "Include shared library": "Gemeinsame Bibliothek einbeziehen",
     "Exclude shared library": "Gemeinsame Bibliothek ausschließen",

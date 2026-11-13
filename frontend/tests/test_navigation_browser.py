@@ -7,16 +7,229 @@ import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import uvicorn
 from playwright.sync_api import expect, sync_playwright
 from test_pages import BackendDouble, fake_backend
 
+from api_client import BackendClient
+
 pytestmark = pytest.mark.skipif(
     os.environ.get("LOCALRAG_UI_TESTS") != "1",
     reason="Set LOCALRAG_UI_TESTS=1 and install Playwright Chromium for isolated UI checks.",
 )
+
+
+def test_waiting_respects_reduced_motion_and_deliberate_focus_changes(
+    isolated_ui: tuple[str, BackendDouble],
+) -> None:
+    url, backend = isolated_ui
+    backend.chats.clear()
+    backend.documents.clear()
+    started, finish = threading.Event(), threading.Event()
+
+    def delayed_send(key: str, text: str, request_id: str) -> dict[str, object]:
+        started.set()
+        assert finish.wait(timeout=15)
+        return backend.send(key, text, request_id)
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(locale="en-GB", reduced_motion="reduce")
+        try:
+            page.goto(url)
+            expect(page.locator('#active-chat-marker [data-ready="true"]')).to_be_attached()
+            with patch.object(BackendClient, "send_message", side_effect=delayed_send):
+                composer = page.locator("#composer textarea")
+                composer.fill("A slow response")
+                composer.press("Enter")
+                expect(page.locator("#submission-status")).to_be_visible()
+                expect(page.locator(".thinking-dots i").first).to_have_css("animation-name", "none")
+                expect(composer).to_be_focused()
+                appearance = page.locator("#appearance").get_by_label("Dark", exact=True)
+                appearance.check()
+                expect(appearance).to_be_focused()
+                assert started.wait(timeout=1)
+                finish.set()
+                expect(page.locator("#submission-status")).to_be_hidden()
+                expect(composer).to_have_js_property("readOnly", False)
+                expect(appearance).to_be_focused()
+                expect(composer).not_to_be_focused()
+        finally:
+            finish.set()
+            browser.close()
+
+
+@pytest.mark.parametrize("send_method", ["button", "enter"])
+def test_composer_sends_text_and_renders_answer(
+    isolated_ui: tuple[str, BackendDouble], send_method: str
+) -> None:
+    """Send through the real component event, not just the controller's Python method."""
+    url, backend = isolated_ui
+    backend.chats.clear()
+    backend.documents.clear()
+    backend.submissions.clear()
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(locale="en-GB")
+        page.set_default_timeout(10000)
+        errors: list[str] = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        try:
+            page.goto(url)
+            expect(page.locator('#active-chat-marker [data-ready="true"]')).to_be_attached()
+            composer = page.locator("#composer textarea")
+            composer.fill("When is the release?")
+            if send_method == "button":
+                page.locator('#composer [data-testid="submit-button"]').click()
+            else:
+                composer.press("Enter")
+            expect(page.locator("#transcript")).to_contain_text("The release is on Friday.")
+            assert len(backend.submissions) == 1
+            assert backend.submissions[0][1] == "When is the release?"
+            expect(composer).to_have_value("")
+            expect(composer).to_be_focused()
+            page.keyboard.type("A follow-up draft")
+            expect(composer).to_have_value("A follow-up draft")
+            assert errors == []
+        finally:
+            browser.close()
+
+
+def test_shift_enter_composition_and_repeated_enter_preserve_draft(
+    isolated_ui: tuple[str, BackendDouble],
+) -> None:
+    url, backend = isolated_ui
+    backend.chats.clear()
+    backend.documents.clear()
+    backend.submissions.clear()
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(locale="en-GB")
+        try:
+            page.goto(url)
+            expect(page.locator('#active-chat-marker [data-ready="true"]')).to_be_attached()
+            composer = page.locator("#composer textarea")
+            composer.press("Enter")
+            assert backend.chats == {}
+            composer.fill("First line")
+            composer.press("Shift+Enter")
+            composer.press_sequentially("Second line")
+            expect(composer).to_have_value("First line\nSecond line")
+            assert backend.submissions == []
+            composer.evaluate("""element => {
+                element.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true, isComposing:true}));
+                element.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true, repeat:true}));
+            }""")
+            assert backend.submissions == []
+            expect(composer).to_have_value("First line\nSecond line")
+            composer.press("Enter")
+            expect(page.locator("#transcript")).to_contain_text("The release is on Friday.")
+            assert len(backend.submissions) == 1
+            assert backend.submissions[0][1] == "First line\nSecond line"
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize(
+    "width,scale,mode,send_method",
+    [
+        (1440, 1, "Light", "enter"),
+        (1048, 1.25, "Dark", "button"),
+        (390, 1, "Light", "button"),
+        (390, 1, "Dark", "enter"),
+    ],
+)
+def test_processing_status_and_retry_keep_the_question(
+    isolated_ui: tuple[str, BackendDouble],
+    width: int,
+    scale: float,
+    mode: str,
+    send_method: str,
+) -> None:
+    url, backend = isolated_ui
+    backend.chats.clear()
+    backend.documents.clear()
+    backend.submissions.clear()
+    started, finish = threading.Event(), threading.Event()
+
+    def delayed_send(key: str, text: str, request_id: str) -> dict[str, object]:
+        started.set()
+        assert finish.wait(timeout=15)
+        return backend.send(key, text, request_id)
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(
+            locale="en-GB", viewport={"width": width, "height": 900}, device_scale_factor=scale
+        )
+        try:
+            page.goto(url)
+            expect(page.locator('#active-chat-marker [data-ready="true"]')).to_be_attached()
+            expect(page.locator("#scope-notice")).to_contain_text("General chat:")
+            page.locator("#appearance").get_by_label(mode, exact=True).check()
+            composer = page.locator("#composer textarea")
+            with patch.object(BackendClient, "send_message", side_effect=delayed_send):
+                composer.fill("A slow response")
+                if send_method == "enter":
+                    composer.press("Enter")
+                else:
+                    page.locator('#composer [data-testid="submit-button"]').click()
+                expect(page.locator("#submission-status")).to_be_visible()
+                expect(page.locator("#submission-status").get_by_role("status")).to_contain_text(
+                    "Creating a reply"
+                )
+                expect(page.locator(".thinking-dots i")).to_have_count(3)
+                expect(composer).to_be_enabled()
+                expect(composer).to_have_js_property("readOnly", True)
+                expect(composer).to_be_focused()
+                expect(page.locator("#transcript")).to_have_attribute("aria-busy", "true")
+                expect(page.locator('#composer [data-testid="submit-button"]')).to_be_disabled()
+                status_box = page.locator("#submission-status").bounding_box()
+                composer_box = page.locator("#composer-shell").bounding_box()
+                assert (
+                    status_box
+                    and composer_box
+                    and status_box["y"] + status_box["height"] <= composer_box["y"]
+                )
+                artifacts = Path(__file__).parents[2] / ".tmp" / "reply-status-focus"
+                artifacts.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(artifacts / f"waiting-{width}-{mode}.png"))
+                assert started.wait(timeout=1)
+                finish.set()
+                expect(page.locator("#transcript")).to_contain_text("The release is on Friday.")
+                expect(page.locator("#submission-status")).to_be_hidden()
+                expect(composer).to_be_enabled()
+                expect(composer).to_have_value("")
+                expect(composer).to_have_js_property("readOnly", False)
+                expect(composer).to_be_focused()
+                page.keyboard.type("Next draft without clicking")
+                expect(composer).to_have_value("Next draft without clicking")
+            backend.fail_send = True
+            composer.fill("Keep the failed question")
+            composer.press("Enter")
+            expect(page.locator("#pending-submission")).to_be_visible()
+            expect(page.locator("#workspace-error textarea")).to_have_value(
+                "Ollama is temporarily unavailable."
+            )
+            expect(page.locator("#submission-status")).to_be_hidden()
+            expect(composer).to_have_value("Keep the failed question")
+            expect(composer).to_be_focused()
+            expect(composer).to_have_js_property("readOnly", True)
+            request_id = backend.submissions[-1][2]
+            backend.fail_send = False
+            page.get_by_role("button", name="Retry submission", exact=True).click()
+            expect(page.locator("#pending-submission")).to_be_hidden()
+            expect(composer).to_be_enabled()
+            expect(composer).to_have_value("")
+            expect(composer).to_be_focused()
+            assert backend.submissions[-1][2] == request_id
+        finally:
+            finish.set()
+            backend.fail_send = False
+            browser.close()
 
 
 @pytest.mark.parametrize(
@@ -281,7 +494,7 @@ def test_icons_localization_and_sidebar_management(
             page.locator("#language").get_by_label("Deutsch", exact=True).check()
             expect(page.locator("html")).to_have_attribute("lang", "de")
             expect(page.locator("#composer textarea")).to_have_attribute(
-                "placeholder", "Frage zu deinen Dokumenten oder hänge Dateien an"
+                "placeholder", "Stelle eine Frage oder hänge Dokumente an"
             )
             expect(page.locator("#composer textarea")).to_have_value("Preserve this draft")
             expect(page.locator(f'#appearance input[value="{mode}"]')).to_be_checked()

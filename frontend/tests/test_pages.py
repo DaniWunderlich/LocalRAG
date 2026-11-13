@@ -334,6 +334,28 @@ def test_source_snapshots_are_escaped_and_can_hide_excerpt_text() -> None:
     assert "Sources (1)" in source_details(sources, False)
 
 
+def test_only_the_standard_no_context_notice_is_localized() -> None:
+    notice = "The documents do not provide enough context to answer this question."
+    session = Session(
+        language="de",
+        conversation={
+            "messages": [
+                {"role": "user", "content": notice, "sources": []},
+                {"role": "assistant", "content": notice, "sources": []},
+                {"role": "assistant", "content": "An original model answer.", "sources": []},
+            ]
+        },
+    )
+    messages = transcript(session)
+    assert messages[0]["content"] == notice
+    assert messages[1]["content"].startswith("Die ausgewählten Dokumente")
+    assert messages[2]["content"] == "An original model answer."
+    assert (
+        session.conversation is not None
+        and session.conversation["messages"][1]["content"] == notice
+    )
+
+
 def test_destructive_actions_require_confirmation(tmp_path: Path) -> None:
     with fake_backend():
         controller, session = make_workspace(tmp_path)
