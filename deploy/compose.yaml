@@ -8,6 +8,7 @@ services:
     environment:
       BACKEND_URL: http://backend:8000
       BACKEND_TIMEOUT_SECONDS: "${BACKEND_TIMEOUT_SECONDS:-600}"
+      MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-20971520}"
       GRADIO_ANALYTICS_ENABLED: "False"
       HF_HUB_DISABLE_TELEMETRY: "1"
     depends_on:
