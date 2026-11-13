@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from api_client import BackendClient, BackendError
+from configuration import upload_limit
 from localization import translate
 
 FILE_TYPES = [".pdf", ".docx", ".txt", ".md", ".markdown"]
@@ -49,7 +50,7 @@ class Session:
     model: str = ""
     top_k: int = 5
     temperature: float = 0.2
-    max_upload_bytes: int = 20 * 1024 * 1024
+    max_upload_bytes: int = field(default_factory=upload_limit)
     show_sources: bool = True
     new_use_library: bool = False
     initialised: bool = False
