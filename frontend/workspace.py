@@ -115,7 +115,14 @@ def transcript(session: Session) -> list[dict[str, str]]:
     return [
         {
             "role": message["role"],
-            "content": message["content"]
+            "content": (
+                translate(message["content"], session.language)
+                if message["role"] == "assistant"
+                and not message.get("sources")
+                and message["content"]
+                == "The documents do not provide enough context to answer this question."
+                else message["content"]
+            )
             + source_details(message.get("sources", []), session.show_sources, session.language),
         }
         for message in session.conversation["messages"]

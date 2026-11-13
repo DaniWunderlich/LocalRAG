@@ -29,6 +29,7 @@ class OllamaStub:
     digest: str = "embedding-revision-a"
     fail_embeddings: bool = False
     answer: str = "The release is on Friday. [Source 1]"
+    general_answer: str = "A general answer from the local model."
     requests: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
 
     def respond(self, request: httpx.Request) -> httpx.Response:
@@ -70,7 +71,12 @@ class OllamaStub:
                 },
             )
         if request.url.path == "/api/chat":
-            return httpx.Response(200, json={"message": {"content": self.answer}})
+            grounded = body["messages"][-1]["content"].startswith(
+                "Document excerpts (JSON records):"
+            )
+            return httpx.Response(
+                200, json={"message": {"content": self.answer if grounded else self.general_answer}}
+            )
         return httpx.Response(404)
 
 

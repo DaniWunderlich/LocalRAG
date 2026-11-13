@@ -87,7 +87,7 @@ def test_private_documents_do_not_leak_into_other_chats_or_library(harness: Harn
     assert answered["messages"][-1]["sources"][0]["document_id"] == document["document_id"]
     other = send(harness, second)
     assert other["messages"][-1]["sources"] == []
-    assert "enough context" in other["messages"][-1]["content"]
+    assert other["messages"][-1]["content"] == harness.ollama.general_answer
 
 
 def test_library_is_explicitly_opted_in_per_thread(harness: Harness) -> None:

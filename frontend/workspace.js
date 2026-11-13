@@ -10,13 +10,14 @@
   let previousFocus = null;
   let inertBackground = [];
   let observedComposer = null;
+  let keepComposerFocus = false;
   const composerResize = new ResizeObserver(() => schedule());
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   let mode = "system";
   let language = "en";
   const labels = {
-    en: {Light:"Light", Dark:"Dark", System:"System", jump:"Jump to latest message"},
-    de: {Light:"Hell", Dark:"Dunkel", System:"System", jump:"Zur neuesten Nachricht springen"}
+    en: {Light:"Light", Dark:"Dark", System:"System", jump:"Jump to latest message", send:"Send message (Enter)", keys:"Enter to send. Shift+Enter for a new line."},
+    de: {Light:"Hell", Dark:"Dunkel", System:"System", jump:"Zur neuesten Nachricht springen", send:"Nachricht senden (Enter)", keys:"Enter zum Senden. Shift+Enter für einen Zeilenumbruch."}
   };
   try { mode = localStorage.getItem("localrag-appearance") || "system"; } catch { /* Storage may be unavailable. */ }
   if (!["light", "dark", "system"].includes(mode)) mode = "system";
@@ -71,6 +72,27 @@
       tools.style.bottom = "auto";
     }
   }
+  function syncSubmission(marker) {
+    const textarea = document.querySelector('#composer textarea');
+    if (!textarea) return;
+    const busy = !!document.querySelector('#submission-status [data-submitting="true"]');
+    const locked = busy || marker?.dataset.pendingSubmission === 'true';
+    if (textarea.readOnly !== locked) textarea.readOnly = locked;
+    document.getElementById('composer')?.setAttribute('aria-busy', String(busy));
+    document.getElementById('transcript')?.setAttribute('aria-busy', String(busy));
+    const send = document.querySelector('#composer [data-testid="submit-button"]');
+    const upload = document.querySelector('#composer [data-testid="upload-button"]');
+    for (const control of [send, upload]) control?.setAttribute('aria-disabled', String(locked));
+    document.querySelectorAll('#composer input[type="file"]').forEach(input => {
+      const disabled = locked || textarea.disabled;
+      if (input.disabled !== disabled) input.disabled = disabled;
+    });
+    const focus = document.activeElement;
+    if (keepComposerFocus && !dialog && !textarea.disabled && !textarea.closest('[inert]')
+        && (focus === document.body || focus === textarea || focus === send || focus?.id === 'retry-submission')) {
+      textarea.focus({preventScroll:true});
+    }
+  }
   function sync() {
     frame = 0;
     alignComposer();
@@ -97,6 +119,10 @@
     }
     language = marker?.dataset.language || "en";
     root.lang = language;
+    const textarea = document.querySelector('#composer textarea');
+    if (textarea) textarea.setAttribute('aria-description', labels[language].keys);
+    const send = document.querySelector('#composer [data-testid="submit-button"]');
+    if (send) { send.title = labels[language].send; send.setAttribute('aria-label', labels[language].send); }
     document.querySelectorAll('#appearance input, #language input').forEach(input => {
       const name = input.closest('#appearance') ? labels[language][input.value] : (input.value === 'de' ? 'Deutsch' : 'English');
       if (name) {
@@ -126,6 +152,7 @@
       button.setAttribute("aria-label", button.textContent.trim());
       button.title = button.textContent.trim();
     });
+    syncSubmission(marker);
     appearance();
   }
   function schedule() { if (!frame) frame = requestAnimationFrame(sync); }
@@ -146,6 +173,53 @@
     if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last?.focus(); }
     else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first?.focus(); }
   }
+  function submissionClick(event) {
+    const textarea = document.querySelector('#composer textarea');
+    const send = event.target.closest?.('#composer [data-testid="submit-button"]');
+    const retry = event.target.closest?.('#retry-submission');
+    const upload = event.target.closest?.('#composer [data-testid="upload-button"]');
+    if ((send || upload) && textarea?.readOnly) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      textarea.focus({preventScroll:true});
+      return;
+    }
+    if (send || retry) {
+      keepComposerFocus = true;
+      textarea?.focus({preventScroll:true});
+      schedule();
+    } else if (!event.target.closest?.('#composer')) {
+      keepComposerFocus = false;
+    }
+  }
+  function focusChanged(event) {
+    if (!event.target.closest?.('#composer, #retry-submission')) keepComposerFocus = false;
+  }
+  function composerDrop(event) {
+    if (event.target.closest?.('#composer') && document.querySelector('#composer textarea')?.readOnly) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }
+  function composerKeys(event) {
+    if (!event.target.matches?.('#composer textarea') || event.key !== 'Enter') return;
+    if (event.isComposing || event.keyCode === 229) { event.stopImmediatePropagation(); return; }
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.type === 'keypress') {
+      if (!event.shiftKey) event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    // Gradio submits on Shift+Enter for multiline inputs; preserve the browser newline instead.
+    if (event.shiftKey) { event.stopImmediatePropagation(); return; }
+    // Intercept before Gradio's textarea handler; use its existing submit event.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (event.repeat || event.target.disabled || event.target.readOnly || dialog) return;
+    if (!event.target.value.trim() && !document.querySelector('#composer [aria-label="File thumbnail"]')) return;
+    const send = document.querySelector('#composer [data-testid="submit-button"]');
+    if (send && !send.disabled) send.click();
+  }
   const observer = new MutationObserver(() => {
     const marker = document.querySelector("#active-chat-marker [data-active-chat]");
     if (marker?.dataset.ready === "true") {
@@ -156,10 +230,15 @@
     }
     schedule();
   });
-  observer.observe(document.body, {childList:true, subtree:true, characterData:true});
+  observer.observe(document.body, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['disabled','hidden']});
   document.addEventListener("scroll", schedule, {capture:true, passive:true});
   document.addEventListener("click", click);
   document.addEventListener("keydown", keys);
+  document.addEventListener("keydown", composerKeys, true);
+  document.addEventListener("keypress", composerKeys, true);
+  document.addEventListener("click", submissionClick, true);
+  document.addEventListener("focusin", focusChanged);
+  document.addEventListener("drop", composerDrop, true);
   window.addEventListener("resize", schedule);
   media.addEventListener("change", appearance);
   appearance();
@@ -172,6 +251,11 @@
     document.removeEventListener("scroll", schedule, true);
     document.removeEventListener("click", click);
     document.removeEventListener("keydown", keys);
+    document.removeEventListener("keydown", composerKeys, true);
+    document.removeEventListener("keypress", composerKeys, true);
+    document.removeEventListener("click", submissionClick, true);
+    document.removeEventListener("focusin", focusChanged);
+    document.removeEventListener("drop", composerDrop, true);
     window.removeEventListener("resize", schedule);
     media.removeEventListener("change", appearance);
   };

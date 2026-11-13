@@ -1,6 +1,6 @@
 """Native Gradio components for the local conversation and document workspace."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -165,20 +165,25 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                     allow_tags=False,
                     autoscroll=True,
                     elem_id="transcript",
-                    placeholder="Attach a document below, then ask a question. Chats are saved on this computer.",
+                    placeholder="Ask a question to start. Attach documents for answers based on your files.",
                 )
                 with gr.Column(visible=False, elem_id="pending-submission") as pending_panel:
                     gr.Markdown(
                         "The unfinished submission stays with this chat. Retry it using the same request ID, or discard it."
                     )
                     with gr.Row():
-                        retry = gr.Button("Retry submission", variant="primary")
+                        retry = gr.Button(
+                            "Retry submission", variant="primary", elem_id="retry-submission"
+                        )
                         discard = gr.Button("Discard draft")
+                submission_status = gr.HTML(
+                    visible=False, elem_id="submission-status", js_on_load=None
+                )
                 with gr.Column(elem_id="composer-shell"):
                     composer = gr.MultimodalTextbox(
                         label="Message",
                         show_label=False,
-                        placeholder="Ask about your documents, or attach files",
+                        placeholder="Ask a question, or attach documents",
                         file_types=FILE_TYPES,
                         file_count="multiple",
                         sources=["upload"],
@@ -217,6 +222,7 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                         '<button id="jump-to-latest" type="button" aria-label="Jump to latest message" title="Jump to latest message" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14m-6-6 6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>',
                         elem_id="jump-control",
                     )
+                scope_notice = gr.Markdown(visible=False, elem_id="scope-notice")
             with gr.Tab("Library", id="library"):
                 gr.Markdown(
                     "# Document library\nDocuments here can be included in any chat. Chat attachments stay with their conversation."
@@ -362,6 +368,14 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                     visible=session.managed_action != "delete",
                 ),
                 manager_delete: gr.update(visible=session.managed_action == "delete"),
+                submission_status: gr.update(value="", visible=False),
+                scope_notice: gr.update(
+                    value=tr(
+                        "General chat: ask any question, or attach documents for document answers."
+                    ),
+                    visible=not session.attachments
+                    and not (session.use_library and session.documents),
+                ),
                 chats: chat_navigation(session),
                 title: "# " + escape(conversation.get("title") or tr("New chat")),
                 chat: transcript(session),
@@ -382,6 +396,8 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                 + session.language
                 + '" data-message-count="'
                 + str(len(conversation.get("messages", [])))
+                + '" data-pending-submission="'
+                + str(pending).lower()
                 + '"></span>',
                 attachment_panel: gr.update(visible=bool(session.attachments)),
                 attachment_table: document_rows(session.attachments, session.language),
@@ -427,9 +443,9 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                     values[component] = value
             if restore_composer:
                 values[composer] = gr.update(
-                    placeholder=tr("Ask about your documents, or attach files"),
+                    placeholder=tr("Ask a question, or attach documents"),
                     value=session.drafts.get(session.key, Draft()).payload(),
-                    interactive=not pending and conversation.get("status", "active") == "active",
+                    interactive=conversation.get("status", "active") == "active",
                 )
             return values
 
@@ -537,8 +553,30 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             )
             return result
 
-        def submit(session: Session, payload: dict[str, Any] | None) -> dict[Any, Any]:
-            return perform(session, payload, lambda: controller.submit(session, payload), True)
+        def working(session: Session) -> dict[Any, Any]:
+            text = escape(translate("Creating a reply…", session.language))
+            return {
+                submission_status: gr.update(
+                    value='<div class="response-pending" data-submitting="true" role="status" aria-live="polite" aria-atomic="true"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>'
+                    + text
+                    + "</span></div>",
+                    visible=True,
+                ),
+                error: gr.update(visible=False),
+            }
+
+        def submit(session: Session, payload: dict[str, Any] | None) -> Iterator[dict[Any, Any]]:
+            session.remember(payload)
+            if payload and (str(payload.get("text") or "").strip() or payload.get("files")):
+                yield working(session)
+            yield perform(session, payload, lambda: controller.submit(session, payload), True)
+
+        def retry_submission(
+            session: Session, payload: dict[str, Any] | None
+        ) -> Iterator[dict[Any, Any]]:
+            if session.key in session.pending:
+                yield working(session)
+            yield perform(session, payload, lambda: controller.retry(session), True)
 
         def open_settings(session: Session, payload: dict[str, Any] | None) -> dict[Any, Any]:
             session.remember(payload)
@@ -702,6 +740,8 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             manager_save,
             manager_delete,
             manager_new_folder,
+            submission_status,
+            scope_notice,
         ]
         outputs = list(dict.fromkeys([*outputs, *localized]))
         options: dict[str, Any] = {
@@ -826,7 +866,7 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             queue=False,
             api_visibility="private",
         )
-        composer.submit(submit, inputs=[state, composer], **options)
+        composer.submit(submit, inputs=[state, composer], trigger_mode="once", **options)
         settings.click(open_settings, inputs=[state, composer], **options)
         close.click(
             lambda: gr.update(visible=False),
@@ -848,9 +888,7 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
         )
         delete_chat.click(remove_chat, inputs=[state, composer, delete_confirm], **options)
         retry.click(
-            lambda session, payload: perform(
-                session, payload, lambda: controller.retry(session), True
-            ),
+            retry_submission,
             inputs=[state, composer],
             **options,
         )

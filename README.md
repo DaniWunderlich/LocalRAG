@@ -6,7 +6,12 @@ Qdrant stores document vectors and excerpts, and an existing Ollama instance
 provides embeddings and chat completions. Documents and questions stay within
 your infrastructure. No cloud AI service or agent framework is required.
 
+Current release: **v0.3.0**. See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
 ## Current functionality
+
+Ask general questions directly to an installed local model without attaching a
+document, or include documents for answers grounded in your files.
 
 Upload PDF, DOCX, UTF-8 text and Markdown; inspect processing status; search
 excerpts independently of generation; ask document questions; inspect the exact
@@ -30,7 +35,7 @@ overflow or shift other chats. Near the screen's lower edge it opens upward
 to keep every action visible. Appearance and language selections also use a
 complete border; keyboard focus is drawn inside the icon without clipped edges.
 Recent turns are included within a bounded history budget to interpret
-follow-up questions; factual answers still rely on the current source excerpts.
+follow-up questions; document-based answers still rely on the current source excerpts.
 
 Attach PDF, DOCX, TXT or Markdown directly to the chat composer, with or without
 a question. Attachments are private to that conversation. Switch on **Include
@@ -48,6 +53,22 @@ tooltip also explain the current action. A round down-arrow appears above the
 composer when later messages are out of view; select it to return to the latest
 message. Reduced-motion preferences are respected. Clicking the text field
 keeps its neutral border.
+
+Press **Enter** to send a message; **Shift+Enter** inserts a newline. The composer
+shows an animated response indicator above the composer while a submission runs and retains a failed question
+for retry. Empty submissions and Enter used to confirm input composition do not
+send a message. Sending with Enter or the submit icon keeps focus in the text
+field. It remains focusable and read-only while waiting, then becomes editable
+when the answer arrives. Deliberately moving focus to another control is
+respected. The indicator also respects reduced-motion preferences.
+
+Without selected documents, questions go directly to the chosen local LLM for
+general answers, using this chat's bounded conversation history. No document
+sources are shown for these answers. Attach a file or include shared-library
+documents to switch automatically to document-based answers. When selected
+documents provide no usable excerpts, the application still returns a localized
+context notice rather than filling gaps with general knowledge. Private files
+from other chats remain excluded in both modes.
 
 Use the sun, moon and monitor icons at the top right to choose **Light**, **Dark** or **System**.
 The browser remembers this preference across pages and reloads. Both appearances
@@ -378,7 +399,7 @@ muted-text styling. Controls retain native labels and keyboard semantics, with
 visible focus rules and reduced-motion support. This is not a full independent
 WCAG conformance audit.
 
-The offline automated suite has 71 backend tests and 22 frontend tests. It covers folder persistence, compatibility with existing chat records, targeted chat management, localized navigation, private evidence isolation, explicit library opt-in,
+The offline automated suite has 81 backend tests and 23 frontend tests. It covers general chat and mode switching, folder persistence, compatibility with existing chat records, targeted chat management, localized navigation, private evidence isolation, explicit library opt-in,
 shared-content deduplication, follow-up context, durable settings, safe deletion,
 interrupted-operation recovery, idempotent sends, composer uploads, isolated
 retry drafts, composer settings and import of the original session-only transcript.
@@ -429,7 +450,7 @@ restore that UI. Both frontends use the same saved-chat API and storage format.
 Existing chat records without a folder load as ungrouped; no reindexing or
 conversion is required.
 
-Sixteen additional browser tests exercise the new navigation with an isolated
+Twenty-four additional browser tests exercise the composer and navigation with an isolated
 in-memory backend and artificial chats, without Docker or Ollama. They cover
 both appearances at 1440 and 390 px, language and appearance persistence,
 renaming, folder creation/removal, confirmed deletion and independent drafts.

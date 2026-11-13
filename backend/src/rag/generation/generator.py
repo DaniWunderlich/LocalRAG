@@ -25,6 +25,10 @@ using only labels present in the supplied context. Reply in the question's langu
 A citation identifies an excerpt; it does not establish that a claim is correct."""
 
 NO_CONTEXT = "The documents do not provide enough context to answer this question."
+GENERAL_SYSTEM_PROMPT = """You are a helpful assistant. Answer the user's question directly
+using your general knowledge and the conversation history. Reply in the user's
+language. Be clear about uncertainty. No documents are selected for this request;
+do not claim to have read documents or invent document citations such as [Source N]."""
 
 
 async def generate_answer(
@@ -35,10 +39,14 @@ async def generate_answer(
     ollama: OllamaClient,
     settings: Settings,
     history: list[HistoryMessage] | None = None,
+    *,
+    allow_general: bool = False,
 ) -> ChatResponse:
     """Reserve room for instructions, question, output and token estimation error."""
-    if not chunks:
+    general_chat = allow_general and not chunks
+    if not chunks and not general_chat:
         return ChatResponse(answer=NO_CONTEXT, sources=[])
+    system_prompt = GENERAL_SYSTEM_PROMPT if general_chat else SYSTEM_PROMPT
     info = await ollama.model_info(model, "completion")
     selected_history: list[dict[str, str]] = []
     history_budget = min(1024, max(0, info.context_length // 6))
@@ -52,9 +60,11 @@ async def generate_answer(
     # Start at a complete user/assistant exchange when older context is omitted.
     while selected_history and selected_history[0]["role"] != "user":
         selected_history.pop(0)
-    question_block = f"Document excerpts (JSON records):\n\nQuestion: {question}"
+    question_block = (
+        question if general_chat else f"Document excerpts (JSON records):\n\nQuestion: {question}"
+    )
     overhead = (
-        count_tokens(SYSTEM_PROMPT)
+        count_tokens(system_prompt)
         + count_tokens(question_block)
         + 128
         + sum(count_tokens(turn["content"]) + 8 for turn in selected_history)
@@ -74,14 +84,16 @@ async def generate_answer(
             "context_limit",
         )
     context, sources = assemble_context(chunks, budget)
-    if not sources:
+    if not sources and not general_chat:
         return ChatResponse(answer=NO_CONTEXT, sources=[])
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         *selected_history,
         {
             "role": "user",
-            "content": f"Document excerpts (JSON records):\n{context}\n\nQuestion: {question}",
+            "content": question
+            if general_chat
+            else f"Document excerpts (JSON records):\n{context}\n\nQuestion: {question}",
         },
     ]
     started = perf_counter()

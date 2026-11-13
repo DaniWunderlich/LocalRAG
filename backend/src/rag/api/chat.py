@@ -25,6 +25,7 @@ async def chat(
             "Select an installed chat model before asking a question.", 422, "model_required"
         )
     async with services.lock:
+        has_documents = any(meta.in_library for meta in services.registry.list())
         sources = await retrieve_chunks(
             request.message,
             request.top_k or settings.rag_top_k,
@@ -41,4 +42,5 @@ async def chat(
         temperature,
         services.ollama,
         settings,
+        allow_general=not has_documents,
     )
