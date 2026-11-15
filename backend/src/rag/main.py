@@ -37,6 +37,7 @@ class JsonFormatter(logging.Formatter):
             "result_count",
             "error_code",
             "error_type",
+            "record_name",
             "status_code",
             "cleanup_pending",
         ):

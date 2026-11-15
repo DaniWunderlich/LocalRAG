@@ -8,6 +8,7 @@ from typing import Any
 import gradio as gr
 
 from api_client import BackendError
+from configuration import upload_size_label
 from localization import GERMAN, translate
 from navigation import RAIL_JS, chat_navigation
 from workspace import (
@@ -234,7 +235,7 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                     type="filepath",
                 )
                 upload = gr.Button("Add to library", variant="primary")
-                gr.Markdown("Up to 20 MiB per file. PDF, DOCX, UTF-8 text and Markdown; no OCR.")
+                library_hint = gr.Markdown(elem_id="library-upload-hint")
                 find_document = gr.Textbox(
                     label="Find a document", placeholder="Find a document", show_label=False
                 )
@@ -420,6 +421,9 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
                     ),
                     "",
                 ),
+                library_hint: tr(
+                    "Up to {limit} per file. PDF, DOCX, UTF-8 text and Markdown; no OCR."
+                ).format(limit=upload_size_label(session.max_upload_bytes)),
                 pending_panel: gr.update(visible=pending),
                 chat_model: gr.update(choices=names, value=model or None),
                 chat_name: gr.update(
@@ -724,6 +728,7 @@ def create_workspace(workspace: Workspace | None = None) -> gr.Blocks:
             detach_confirm,
             delete_document_confirm,
             library_upload,
+            library_hint,
             search_results,
             appearance_control,
             language_control,

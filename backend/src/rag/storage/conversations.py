@@ -1,10 +1,27 @@
 """Atomic per-conversation storage on the existing persistent document volume."""
 
+import logging
 from pathlib import Path
 from uuid import UUID
 
+from rag.errors import AppError
 from rag.models import Conversation, ConversationSummary
 from rag.storage.documents import atomic_write
+
+logger = logging.getLogger(__name__)
+
+
+def unreadable_record(path: Path, error: Exception) -> AppError:
+    """Identify the record for operators without logging saved conversation contents."""
+    logger.warning(
+        "conversation_record_unreadable",
+        extra={"record_name": path.name, "error_type": type(error).__name__},
+    )
+    return AppError(
+        "A saved chat record is unreadable. Restore or repair it before opening it or removing private files.",
+        409,
+        "chat_record_unreadable",
+    )
 
 
 class ConversationStore:
@@ -19,16 +36,30 @@ class ConversationStore:
         path = self.path / f"{conversation_id}.json"
         if not path.exists():
             return None
-        conversation = Conversation.model_validate_json(path.read_bytes())
-        if conversation.conversation_id != conversation_id:
-            raise ValueError("Conversation file ID is inconsistent.")
-        return conversation
+        try:
+            conversation = Conversation.model_validate_json(path.read_bytes())
+            if conversation.conversation_id != conversation_id:
+                raise ValueError("Conversation file ID is inconsistent.")
+            return conversation
+        except (ValueError, OSError) as error:
+            raise unreadable_record(path, error) from error
 
-    def all(self) -> list[Conversation]:
-        """Return recent conversations first, including recoverable deletions."""
+    def all(self, *, strict: bool = True) -> list[Conversation]:
+        """Allow partial navigation while requiring complete references before cleanup."""
         conversations = []
         for path in self.path.glob("*.json"):
-            conversation = self.get(UUID(path.stem))
+            try:
+                try:
+                    conversation_id = UUID(path.stem)
+                    if path.name != f"{conversation_id}.json":
+                        raise ValueError("Conversation filename is not canonical.")
+                except ValueError as error:
+                    raise unreadable_record(path, error) from error
+                conversation = self.get(conversation_id)
+            except AppError:
+                if strict:
+                    raise
+                continue
             if conversation is not None:
                 conversations.append(conversation)
         return sorted(conversations, key=lambda item: item.updated_at, reverse=True)
@@ -45,7 +76,7 @@ class ConversationStore:
                 document_count=len(item.document_ids),
                 status=item.status,
             )
-            for item in self.all()
+            for item in self.all(strict=False)
         ]
 
     def save(self, conversation: Conversation) -> None:

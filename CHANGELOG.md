@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Keep healthy chats and startup recovery available when a saved chat record is corrupt or unreadable; retain damaged originals, log only record identifiers, and block unsafe private-file cleanup until all references can be checked.
+- Apply `MAX_UPLOAD_BYTES` consistently to Gradio ingress and backend validation in Compose, and show the actual backend limit in German and English.
+
 ## v0.3.0 — 2026-11-13
 
 - Send chat messages with Enter and insert newlines with Shift+Enter, preserving input composition and preventing repeated-key submissions.

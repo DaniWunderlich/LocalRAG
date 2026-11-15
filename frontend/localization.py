@@ -1,6 +1,7 @@
 """Explicit UI translations; user messages, chat names and filenames stay original."""
 
 GERMAN = {
+    "A saved chat record is unreadable. Restore or repair it before opening it or removing private files.": "Ein gespeicherter Chat ist nicht lesbar. Stelle seine Datei wieder her oder repariere sie, bevor du ihn öffnest oder private Dateien entfernst.",
     "Creating a reply…": "Antwort wird erstellt…",
     "General chat: ask any question, or attach documents for document answers.": "Allgemeiner Chat: Stelle eine Frage oder hänge Dokumente für dokumentbasierte Antworten an.",
     "The documents do not provide enough context to answer this question.": "Die ausgewählten Dokumente liefern nicht genügend Kontext, um diese Frage zu beantworten.",
@@ -55,7 +56,7 @@ GERMAN = {
     "# Document library\nDocuments here can be included in any chat. Chat attachments stay with their conversation.": "# Dokumentbibliothek\nDiese Dokumente können in jedem Chat verwendet werden. Chat-Anhänge bleiben bei ihrem Gespräch.",
     "Add documents": "Dokumente hinzufügen",
     "Add to library": "Zur Bibliothek hinzufügen",
-    "Up to 20 MiB per file. PDF, DOCX, UTF-8 text and Markdown; no OCR.": "Bis zu 20 MiB pro Datei. PDF, DOCX, UTF-8-Text und Markdown; keine Texterkennung (OCR).",
+    "Up to {limit} per file. PDF, DOCX, UTF-8 text and Markdown; no OCR.": "Bis zu {limit} pro Datei. PDF, DOCX, UTF-8-Text und Markdown; keine Texterkennung (OCR).",
     "Find a document": "Dokument suchen",
     "Selected document": "Ausgewähltes Dokument",
     "Delete the selected original and its index": "Ausgewähltes Original und seinen Index löschen",
