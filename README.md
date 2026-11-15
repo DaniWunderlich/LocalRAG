@@ -26,15 +26,15 @@ instance. Documents, conversations and the prepared example answer are fictional
 
 **Chat and sources, light appearance**
 
-![Light chat view with saved folders, a document-based answer and its source excerpt](docs/screenshots/chat-light.png)
+![Light chat view with saved folders, a document-based answer and its source excerpt](assets/screenshots/chat-light.png)
 
 **Chat management, dark appearance**
 
-![Dark chat view with sidebar folders and the rename, move and delete menu](docs/screenshots/chat-dark.png)
+![Dark chat view with sidebar folders and the rename, move and delete menu](assets/screenshots/chat-dark.png)
 
 **Shared document library**
 
-![Document library with upload controls, indexed example documents and a file-size limit](docs/screenshots/library.png)
+![Document library with upload controls, indexed example documents and a file-size limit](assets/screenshots/library.png)
 
 ## Start on Windows or Linux
 
@@ -119,18 +119,12 @@ docker compose --env-file .env -f deploy/compose.yaml -p localrag down
 ```
 
 Do not add `--volumes` when keeping your data. Back up the document and Qdrant
-volumes together. Changing the embedding model requires a controlled reindex;
-see [configuration, backups and development](docs/OPERATIONS.md).
+volumes together. Changing the embedding model requires a controlled reindex.
 
-## Limits and further reading
+## Limits
 
 Uploads are indexed synchronously, and answers arrive as complete responses.
 Large documents or slower models can take time. The current backend serializes
 mutations and runs as a single instance. OCR and authentication are not included.
 Source excerpts show the evidence supplied to the model; answer quality and
 citation compliance still depend on the chosen model.
-
-- [Configuration, API, backups, reindexing and development](docs/OPERATIONS.md)
-- [Release history](CHANGELOG.md)
-- [Verified project review](docs/REVIEW-2026-11-13.md)
-- [Original vision](docs/VISION.md) and [initial specification](docs/SPEC.md)
