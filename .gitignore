@@ -1,5 +1,5 @@
-# ── Project documents (summarised in README) ──────────────────────────────────
-docs/DESIGN.md
+# Internal project notes and ideas (local only)
+/docs/
 
 # ── Python ─────────────────────────────────────────────────────────────────────
 __pycache__/
