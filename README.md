@@ -1,5 +1,14 @@
 # Local RAG
 
+**English (UK)** | [Deutsch](README.de.md)
+
+[![Release](https://img.shields.io/github/v/release/DaniWunderlich/LocalRAG)](https://github.com/DaniWunderlich/LocalRAG/releases/latest)
+[![Python 3.14](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](backend/pyproject.toml)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)](backend/pyproject.toml)
+[![Gradio](https://img.shields.io/badge/UI-Gradio-F97316?logo=gradio&logoColor=white)](frontend/pyproject.toml)
+[![Docker Compose](https://img.shields.io/badge/Deployment-Docker_Compose-2496ED?logo=docker&logoColor=white)](deploy/compose.yaml)
+[![Tests: pytest](https://img.shields.io/badge/Tests-pytest-0A9EDC?logo=pytest&logoColor=white)](#tests)
+
 Chat with your documents, entirely on your own infrastructure. A Gradio interface
 connects FastAPI, Qdrant and your existing Ollama installation. No cloud AI account
 is required.
@@ -90,7 +99,7 @@ docker compose --env-file .env -f deploy/compose.yaml -p localrag up -d --build 
 
 Open **[http://localhost:8501](http://localhost:8501)**, choose a chat model, and ask
 a question. Use the **+** in the composer to attach documents, or upload shared
-documents under **Library** and enable **Include library** for the chat.
+documents under **Library** and enable **Include shared library** for the chat.
 
 Only the browser interface is published, on loopback. The app has no
 authentication; use it in a trusted local environment.
@@ -124,7 +133,13 @@ volumes together. Changing the embedding model requires a controlled reindex.
 ## Limits
 
 Uploads are indexed synchronously, and answers arrive as complete responses.
-Large documents or slower models can take time. The current backend serializes
+Large documents or slower models can take time. The current backend serialises
 mutations and runs as a single instance. OCR and authentication are not included.
 Source excerpts show the evidence supplied to the model; answer quality and
 citation compliance still depend on the chosen model.
+
+## Tests
+
+The [backend](backend/tests) and [frontend](frontend/tests) have automated pytest
+test suites. The pytest badge identifies the test framework. GitHub Actions is
+not configured yet, so there is no live CI test status.
